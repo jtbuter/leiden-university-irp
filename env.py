@@ -27,13 +27,12 @@ def create_threshold_space(subimage, delta_i = 15):
     return np.linspace(glmin, glmax, delta_i)
 
 def discretize(sample, grid):
-    return list(int(np.digitize(s, g)) for s, g in zip(sample, grid))  # apply along each dimension
+    return tuple(int(np.digitize(s, g)) for s, g in zip(sample, grid))  # apply along each dimension
 
 class Trus(gym.Env):
-    def __init__(self, subimage, sublabel, x_s, y_s, state_grid, delta_i = 15, disk_sizes = [0, 2, 5]):
+    def __init__(self, subimage, sublabel, state_grid, delta_i = 15, disk_sizes = [0, 2, 5]):
         self.subimage = subimage
         self.sublabel = sublabel
-        self.x_s, self.y_s = x_s, y_s
         self.state_grid = state_grid
 
         features, bins = state_grid.shape
@@ -44,7 +43,6 @@ class Trus(gym.Env):
         self.observation_space = gym.spaces.MultiDiscrete([bins] * features)
         self.dsim_old = np.inf
 
-        print(self.action_space.shape)
 
     def observation(self):
         height, width = self.subimage.shape
@@ -54,7 +52,7 @@ class Trus(gym.Env):
 
         # No objects were found
         if N_o == 0:
-            return discretize((0, 0, self.x_s, self.y_s, 0), self.state_grid)
+            return discretize((0, 0, 0), self.state_grid)
 
         c = max(contours, key = cv2.contourArea)
 
@@ -68,7 +66,7 @@ class Trus(gym.Env):
 
         area = (subimage_area - object_area) / subimage_area
 
-        return discretize((area, compactness, self.x_s, self.y_s, N_o), self.state_grid)
+        return discretize((area, compactness, N_o), self.state_grid)
     
 
     def reset(self, seed = None, options = None):

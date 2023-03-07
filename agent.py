@@ -1,13 +1,12 @@
 import gymnasium as gym
 import numpy as np
+from env import Trus
 #Loading and rendering the gym environment
 
-env = gym.make("Taxi-v3").env
+env = Trus()
 env.reset()
-env.render()
 
 #Setting the hyperparameters
-              
 alpha = 0.7 #learning rate                 
 discount_factor = 0.618               
 epsilon = 1                  
@@ -19,5 +18,7 @@ train_episodes = 2000
 test_episodes = 100          
 max_steps = 100
 
-Q = np.zeros((env.observation_space.n, env.action_space.n))
+print(env.observation_space.nvec)
+
+Q = np.zeros(env.observation_space.n + env.action_space.n)
 
