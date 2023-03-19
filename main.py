@@ -109,6 +109,4 @@ for episode in range(train_episodes):
     training_rewards.append(np.sum(total_training_rewards))
     epsilons.append(epsilon)
     
-    
-
 print ("Training score over time: " + str(sum(training_rewards) / train_episodes))

@@ -9,7 +9,7 @@ def compute_dissimilarity(mask, sublabel):
     return np.sum(np.logical_xor(mask, sublabel)) / (width * height)
 
 def threshold_subimage(subimage, threshold):
-    return cv2.threshold(subimage, thresh = threshold, maxval = 255, type = cv2.THRESH_BINARY)[-1]
+    return 255 - cv2.threshold(subimage, thresh = threshold, maxval = 255, type = cv2.THRESH_BINARY)[-1]
 
 
 def morph_mask(mask, size):
@@ -26,8 +26,10 @@ def create_threshold_space(subimage, delta_i = 15):
 
     return np.linspace(glmin, glmax, delta_i)
 
+
 def discretize(sample, grid):
     return tuple(int(np.digitize(s, g)) for s, g in zip(sample, grid))  # apply along each dimension
+
 
 class Trus(gym.Env):
     def __init__(self, subimage, sublabel, state_grid, delta_i = 15, disk_sizes = [0, 2, 5]):
