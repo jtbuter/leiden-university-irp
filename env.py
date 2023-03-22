@@ -1,98 +1,69 @@
-import numpy as np
 import gymnasium as gym
-import cv2
+import numpy as np
+import cv2 as cv
 import matplotlib.pyplot as plt
 
-def compute_dissimilarity(mask, sublabel):
-    width, height = sublabel.shape
+class UltraSoundEnv(gym.Env):
+    action_map = np.array([(-1, -1), (-1, 1), (1, -1), (1, 1)])
 
-    return np.sum(np.logical_xor(mask, sublabel)) / (width * height)
-
-def threshold_subimage(subimage, threshold):
-    return 255 - cv2.threshold(subimage, thresh = threshold, maxval = 255, type = cv2.THRESH_BINARY)[-1]
-
-
-def morph_mask(mask, size):
-    if size == 0:
-        return mask
-
-    se = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size))
-
-    return cv2.morphologyEx(mask, cv2.MORPH_OPEN, se)
-
-
-def create_threshold_space(subimage, delta_i = 15):
-    glmin, glmax = np.min(subimage), np.max(subimage)
-
-    return np.linspace(glmin, glmax, delta_i)
+    def __init__(self, sample, label, n_thresholds = 10):
+        self.state = sample.copy()
+        self.label = label.copy()
+        self.sample = sample.copy()
+        self.dissim = self._compute_reward(np.full(sample.shape, 255))
+        self.action_space = gym.spaces.Discrete(n = 4)
+        self.observation_space = gym.spaces.Box(
+            low = 0, high = 255, shape = sample.shape, dtype = np.uint8
+        )
+        self.thresholds = np.linspace(
+            start = np.min(sample), stop = np.max(sample), num = n_thresholds, dtype = np.uint8
+        )
+        self.n_thresholds = n_thresholds
+        self.tis = np.array([0, self.n_thresholds - 1])
 
 
-def discretize(sample, grid):
-    return tuple(int(np.digitize(s, g)) for s, g in zip(sample, grid))  # apply along each dimension
+    def _process_thresholds(self, action):
+        return np.clip(self.tis + self.action_map[action], 0, self.n_thresholds - 1)
 
 
-class Trus(gym.Env):
-    def __init__(self, subimage, sublabel, state_grid, delta_i = 15, disk_sizes = [0, 2, 5]):
-        self.subimage = subimage
-        self.sublabel = sublabel
-        self.state_grid = state_grid
+    def _compute_reward(self, predicted):
+        height, width = self.label.shape
 
-        features, bins = state_grid.shape
-        bins = bins + 1
-
-        self.actions = [create_threshold_space(self.subimage, delta_i), disk_sizes]
-        self.action_space = gym.spaces.MultiDiscrete([delta_i, len(disk_sizes)])
-        self.observation_space = gym.spaces.MultiDiscrete([bins] * features)
-        self.dsim_old = np.inf
-
-
-    def observation(self):
-        height, width = self.subimage.shape
-        subimage_area = height * width
-        contours = cv2.findContours(self.mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0]
-        N_o = len(contours)
-
-        # No objects were found
-        if N_o == 0:
-            return discretize((0, 0, 0), self.state_grid)
-
-        c = max(contours, key = cv2.contourArea)
-
-        object_area = cv2.contourArea(c)
-
-        if object_area == 0:
-            compactness = 0
-        else:
-            object_perimeter = cv2.arcLength(c, True)
-            compactness = (4 * np.pi * object_area) / (object_perimeter ** 2)
-
-        area = (subimage_area - object_area) / subimage_area
-
-        return discretize((area, compactness, N_o), self.state_grid)
+        return np.sum(np.logical_xor(predicted, self.label)) / (height * width)
     
 
     def reset(self, seed = None, options = None):
         super().reset(seed = seed)
 
-        self.dsim_old = np.inf
-        self.mask = np.zeros_like(self.subimage)
+        self.tis = np.array([0, self.n_thresholds - 1])
+        self.dissim = self._compute_reward(np.full(self.sample.shape, 255))
+        self.state = self.sample.copy()
 
-        return self.observation(), {}
+        return self.sample.copy(), {}
 
 
     def step(self, action):
-        thresh_index, size_index = action
-        threshold, size = self.actions[0][thresh_index], self.actions[1][size_index]
+        self.tis = self._process_thresholds(action)
+        lt, rt = self.thresholds[self.tis]
 
-        mask = threshold_subimage(self.subimage, threshold)
+        predicted = cv.inRange(self.sample, int(lt), int(rt))
+        self.state = cv.bitwise_and(self.sample, self.sample, mask = predicted)
 
-        self.mask = morph_mask(mask, size)
-        self.state = self.observation()
+        dissim = self._compute_reward(predicted)
+        done = dissim < 0.05
 
-        dsim_new = compute_dissimilarity(self.mask, self.sublabel)
+        if dissim < self.dissim:
+            reward = 10
+        elif dissim == self.dissim:
+            reward = 0
+        elif dissim > self.dissim:
+            reward = 0
 
-        reward = 10 if dsim_new < self.dsim_old else 0
+        self.dissim = dissim
 
-        self.dsim_old = dsim_new
-
-        return self.state, reward, dsim_new < 0.05, False, {}
+        return self.state, reward, done, False, {}
+    
+    
+    def render(self):
+        plt.imshow(self.state, cmap = 'gray', vmin = np.min(self.sample), vmax = np.max(self.sample))
+        plt.show()
