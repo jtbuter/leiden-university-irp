@@ -1,56 +1,70 @@
 from env import UltraSoundEnv
+import tensorflow as tf
 import cv2 as cv
 import matplotlib.pyplot as plt
 import numpy as np
 from stable_baselines3 import PPO, DQN
-import gymnasium as gym
+import stable_baselines3.common.env_checker
+from stable_baselines3.common.logger import configure
+from stable_baselines3.common.monitor import Monitor
 
-def create_subimages(image, rows, cols):
-    height, width = image.shape
-    subimage_width, subimage_height = int(width / cols), int(height / rows)
-    subimages, coords = [], []
+import gym
+import utils
 
-    for y in range(0, height, subimage_height):
-        for x in range(0, width, subimage_width):
-            subimage = image[y:y + subimage_height, x:x + subimage_width]
+import time
+import random
+import os
+import numpy as np
 
-            subimages.append(subimage)
-            coords.append((x, y))
-
-    return subimages, coords
+log_dir = "tmp/"
+os.makedirs(log_dir, exist_ok=True)
 
 image = cv.imread("../data/trus/images/case10_11.png", cv.IMREAD_GRAYSCALE)
 label = cv.imread("../data/trus/labels/case10_11.png", cv.IMREAD_GRAYSCALE)
-subimage = create_subimages(image, rows = 32, cols = 16)[0][184]
-sublabel = create_subimages(label, rows = 32, cols = 16)[0][184]
+subimage = utils.create_subimages(image, rows = 32, cols = 16)[0][184]
+sublabel = utils.create_subimages(label, rows = 32, cols = 16)[0][184]
 
-env = UltraSoundEnv(sample = subimage, label = sublabel, n_thresholds = 20)
+env = UltraSoundEnv(subimage, sublabel)
 
-model = DQN(policy = "CnnPolicy", env = env, verbose = 1)
-model.learn(total_timesteps = 25000)
+tmp_path = "tmp/sb3_log/"
+new_logger = configure(tmp_path, ["stdout", "csv", "tensorboard"])
 
-obs = env.reset()
+model = DQN(
+    env = env,
+    policy = "MlpPolicy",
+    learning_rate = 1e-4,
+    buffer_size = 10000,
+    exploration_fraction = 0.1,
+    exploration_final_eps = 0.01,
+    train_freq = 4,
+    learning_starts = 1000,
+    target_update_interval = 1000,
+    verbose = 1
+)
+model.set_logger(new_logger)
+model.learn(total_timesteps = 25000, log_interval = 4)
 
-for i in range(1000):
-    action, _state = model.predict(obs)
-    obs, reward, done, truncated, info = env.step(action)
+# obs = env.reset()
+
+# for i in range(1000):
+#     action, _state = model.predict(obs)
+#     obs, reward, done, truncated, info = env.step(action)
     
-    env.render()
+#     env.render()
 
-    if done:
-        obs = env.reset()
+#     if done:
+#         obs = env.reset()
 
-        print('Done')
+#         print('Done')
 
 
 # print(env.dissim)
 
+
 # while 1:
-#     env.reset()
-#     state, reward, done, _, _ = env.step(env.action_space.sample())
+#     state, reward, done, info = env.step(env.action_space.sample())
 
 #     print(env.dissim)
 #     print(env._compute_reward(sublabel))
 
-#     plt.imshow(state, cmap = 'gray', vmin = 0, vmax = 1)
-#     plt.show()
+#     env.render()
