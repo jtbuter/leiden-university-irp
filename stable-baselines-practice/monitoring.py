@@ -10,19 +10,25 @@ class CustomCallback(BaseCallback):
     def __init__(self, verbose: int = 0):
         super().__init__(verbose)
 
-        self.returns = []
+        self.timestep_rewards = []
+        self.episode_returns = []
+        self.episode_return = 0
 
     def _on_step(self) -> bool:
-        # env = self.locals['self'].env.envs[0]
+        reward = self.locals['rewards'].item()
 
-        print(self.locals['rewards'].item())        
+        self.episode_return += reward
+        self.timestep_rewards.append(reward)
 
-        # if self.locals["dones"].item():
-        #     print('x')
+        if self.locals["dones"].item():
+            self.episode_returns.append(self.episode_return)
 
-        # print(env.episode_returns)
+            # print(self.episode_return)
 
-        # if self.n_calls % 10000 == 0:
+            self.episode_return = 0
+
+        if self.n_calls % 1000 == 0:
+            print(self.episode_return)
             # ep_reward = 
             # self.returns.append((sum(env.rewards), env.needs_reset))
             # print(self.n_calls)
@@ -33,9 +39,9 @@ class CustomCallback(BaseCallback):
 env = gym.make("CartPole-v1")
 monitor = Monitor(env)
 custom_callback = CustomCallback()
-model = DQN("MlpPolicy", monitor)
+model = DQN("MlpPolicy", monitor, tensorboard_log = './tensor-logs', learning_rate=0.001)
 
-model.learn(total_timesteps = 250000, callback = custom_callback)
+model.learn(total_timesteps = 150000, log_interval = 1, callback = custom_callback)
 # model.save("dqn_cartpole")
 
 # del model # remove to demonstrate saving and loading

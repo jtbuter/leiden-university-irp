@@ -26,23 +26,23 @@ sublabel = utils.create_subimages(label, rows = 32, cols = 16)[0][184]
 
 env = UltraSoundEnv(subimage, sublabel)
 
-tmp_path = "tmp/sb3_log/"
-new_logger = configure(tmp_path, ["stdout", "csv", "tensorboard"])
+# tmp_path = "tmp/sb3_log/"
+# new_logger = configure(tmp_path, ["stdout", "csv", "tensorboard"])
 
-model = DQN(
-    env = env,
-    policy = "MlpPolicy",
-    learning_rate = 1e-4,
-    buffer_size = 10000,
-    exploration_fraction = 0.1,
-    exploration_final_eps = 0.01,
-    train_freq = 4,
-    learning_starts = 1000,
-    target_update_interval = 1000,
-    verbose = 1
-)
-model.set_logger(new_logger)
-model.learn(total_timesteps = 25000, log_interval = 4)
+# model = DQN(
+#     env = env,
+#     policy = "MlpPolicy",
+#     learning_rate = 1e-4,
+#     buffer_size = 10000,
+#     exploration_fraction = 0.1,
+#     exploration_final_eps = 0.01,
+#     train_freq = 4,
+#     learning_starts = 1000,
+#     target_update_interval = 1000,
+#     verbose = 1
+# )
+# model.set_logger(new_logger)
+# model.learn(total_timesteps = 25000, log_interval = 4)
 
 # obs = env.reset()
 
@@ -61,10 +61,10 @@ model.learn(total_timesteps = 25000, log_interval = 4)
 # print(env.dissim)
 
 
-# while 1:
-#     state, reward, done, info = env.step(env.action_space.sample())
+while 1:
+    state, reward, done, info = env.step(env.action_space.sample())
 
-#     print(env.dissim)
-#     print(env._compute_reward(sublabel))
+    print(env.dissim)
+    print(env._compute_reward(sublabel))
 
-#     env.render()
+    env.render()
