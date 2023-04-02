@@ -1,57 +1,46 @@
-import gym
-import json, os
-import numpy as np
-
+import numpy as np, gym
+from gym.wrappers import TimeLimit
 from stable_baselines3 import DQN
-from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.callbacks import BaseCallback
+from env import UltraSoundEnv
+import utils
+import matplotlib.pyplot as plt
+import cv2
+
+image = utils._read_image("/home/joel/Documents/leiden/introductory_research_project/data/trus/images/case10_11.png")
+label = utils._read_image("/home/joel/Documents/leiden/introductory_research_project/data/trus/labels/case10_11.png")
+subimages, coords = utils._extract_subimages(image, 64, 64)
+sublabels, coords = utils._extract_subimages(label, 64, 64)
+
+subimage = subimages[36]
+sublabel = sublabels[36]
+
+env = UltraSoundEnv(subimage, sublabel)
+# env = TimeLimit(env, 150)
+model = DQN("MlpPolicy", env, tensorboard_log="./tensor-logs", verbose=0)
 
 class CustomCallback(BaseCallback):
     def __init__(self, verbose: int = 0):
         super().__init__(verbose)
 
-        self.timestep_rewards = []
-        self.episode_returns = []
-        self.episode_return = 0
-
     def _on_step(self) -> bool:
-        reward = self.locals['rewards'].item()
+        print(self.locals['rewards'].item(), self.locals['dones'].item())
 
-        self.episode_return += reward
-        self.timestep_rewards.append(reward)
+model.learn(150, callback=CustomCallback(), log_interval=1)
 
-        if self.locals["dones"].item():
-            self.episode_returns.append(self.episode_return)
+# class TensorboardCallback(BaseCallback):
+#     """
+#     Custom callback for plotting additional values in tensorboard.
+#     """
 
-            # print(self.episode_return)
+#     def __init__(self, verbose = 0):
+#         super().__init__(verbose)
 
-            self.episode_return = 0
+#     def _on_step(self) -> bool:
+#         # Log scalar value (here a random variable)
+#         value = np.random.random()
+#         self.logger.record("random_value", value)
 
-        if self.n_calls % 1000 == 0:
-            print(self.episode_return)
-            # ep_reward = 
-            # self.returns.append((sum(env.rewards), env.needs_reset))
-            # print(self.n_calls)
-            # print(json.dumps(self.locals, indent = 4, default = str))
+#         return True
 
-        return True
-    
-env = gym.make("CartPole-v1")
-monitor = Monitor(env)
-custom_callback = CustomCallback()
-model = DQN("MlpPolicy", monitor, tensorboard_log = './tensor-logs', learning_rate=0.001)
-
-model.learn(total_timesteps = 150000, log_interval = 1, callback = custom_callback)
-# model.save("dqn_cartpole")
-
-# del model # remove to demonstrate saving and loading
-
-# model = DQN.load("dqn_cartpole")
-
-# obs = monitor.reset()
-# while True:
-#     action, _states = model.predict(obs, deterministic=True)
-#     obs, reward, done, info = monitor.step(action)
-#     monitor.render()
-#     if done:
-#       obs = monitor.reset()
+# model.learn(200000, callback = TensorboardCallback())

@@ -21,25 +21,29 @@ class UltraSoundEnv(gym.Env):
         self.threshold_ids = np.array([0, self.num_thresholds - 1])
         self.thresholds = np.linspace(np.min(sample), np.max(sample), num_thresholds, dtype = np.uint8)
 
-        self.dissim = utils.__compute_dissimilarity(np.full(label.shape, 255))
+        bit_mask = np.full(self.label.shape, 255)
+        self.dissim = utils._compute_dissimilarity(bit_mask, self.label)
+
+
+    def _reward(self, dissim):
+        if dissim < self.dissim:
+            return 20
+        elif dissim == self.dissim:
+            return 10
+        elif dissim > self.dissim:
+            return 0
 
 
     def step(self, action):
-        new_threshold_ids = utils.__process_thresholds(action, self.action_map, self.threshold_ids, self.num_thresholds)
+        new_threshold_ids = utils._process_thresholds(action, self.action_map, self.threshold_ids, self.num_thresholds)
         lt, rt = self.thresholds[new_threshold_ids]
 
         bit_mask = cv.inRange(self.sample, int(lt), int(rt))
         next_state = cv.bitwise_and(self.sample, self.sample, mask = bit_mask)
 
-        dissim = utils.__compute_dissimilarity(bit_mask, self.label)
+        dissim = utils._compute_dissimilarity(bit_mask, self.label)
+        reward = self._reward(dissim)
         is_done = bool(dissim < 0.05)
-
-        if dissim < self.dissim:
-            reward = 10
-        elif dissim == self.dissim:
-            reward = 0
-        elif dissim > self.dissim:
-            reward = 0
 
         self.dissim = dissim
         self.threshold_ids = new_threshold_ids
@@ -49,9 +53,10 @@ class UltraSoundEnv(gym.Env):
 
 
     def reset(self):
+        bit_mask = np.full(self.label.shape, 255)
         self.state = self.sample.reshape(*self.sample.shape, 1)
         self.threshold_ids = np.array([0, self.num_thresholds - 1])
-        self.dissim = self.__compute_dissimilarity(np.full(self.label.shape, 255))
+        self.dissim = utils._compute_dissimilarity(bit_mask, self.label)
 
         return self.state
 
