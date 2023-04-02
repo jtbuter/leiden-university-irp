@@ -1,125 +1,50 @@
+import traceback
 import warnings
+import time
+import sys
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 import numpy as np
 import torch as th
 from gym import spaces
+from gym.wrappers import TimeLimit
 from torch.nn import functional as F
 
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.buffers import ReplayBuffer
-from stable_baselines3.common.off_policy_algorithm import OffPolicyAlgorithm
 from stable_baselines3.common.policies import BasePolicy
-from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Schedule
-from stable_baselines3.common.utils import get_linear_fn, get_parameters_by_name, polyak_update
+from stable_baselines3.common.base_class import BaseAlgorithm
+from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, RolloutReturn, Schedule, TrainFreq, TrainFrequencyUnit
+from stable_baselines3.common.utils import get_linear_fn, get_parameters_by_name, polyak_update, safe_mean
+from stable_baselines3.common.vec_env import VecEnv
 from QPolicy import QPolicy
 
 Q = TypeVar("Q", bound="Q")
 MlpPolicy = QPolicy
 
-class Q(OffPolicyAlgorithm):
-    """
-    Deep Q-Network (DQN)
-
-    Paper: https://arxiv.org/abs/1312.5602, https://www.nature.com/articles/nature14236
-    Default hyperparameters are taken from the Nature paper,
-    except for the optimizer and learning rate that were taken from Stable Baselines defaults.
-
-    :param policy: The policy model to use (MlpPolicy, CnnPolicy, ...)
-    :param env: The environment to learn from (if registered in Gym, can be str)
-    :param learning_rate: The learning rate, it can be a function
-        of the current progress remaining (from 1 to 0)
-    :param buffer_size: size of the replay buffer
-    :param learning_starts: how many steps of the model to collect transitions for before learning starts
-    :param batch_size: Minibatch size for each gradient update
-    :param tau: the soft update coefficient ("Polyak update", between 0 and 1) default 1 for hard update
-    :param gamma: the discount factor
-    :param train_freq: Update the model every ``train_freq`` steps. Alternatively pass a tuple of frequency and unit
-        like ``(5, "step")`` or ``(2, "episode")``.
-    :param gradient_steps: How many gradient steps to do after each rollout (see ``train_freq``)
-        Set to ``-1`` means to do as many gradient steps as steps done in the environment
-        during the rollout.
-    :param replay_buffer_class: Replay buffer class to use (for instance ``HerReplayBuffer``).
-        If ``None``, it will be automatically selected.
-    :param replay_buffer_kwargs: Keyword arguments to pass to the replay buffer on creation.
-    :param optimize_memory_usage: Enable a memory efficient variant of the replay buffer
-        at a cost of more complexity.
-        See https://github.com/DLR-RM/stable-baselines3/issues/37#issuecomment-637501195
-    :param target_update_interval: update the target network every ``target_update_interval``
-        environment steps.
-    :param exploration_fraction: fraction of entire training period over which the exploration rate is reduced
-    :param exploration_initial_eps: initial value of random action probability
-    :param exploration_final_eps: final value of random action probability
-    :param max_grad_norm: The maximum value for the gradient clipping
-    :param tensorboard_log: the log location for tensorboard (if None, no logging)
-    :param policy_kwargs: additional arguments to be passed to the policy on creation
-    :param verbose: Verbosity level: 0 for no output, 1 for info messages (such as device or wrappers used), 2 for
-        debug messages
-    :param seed: Seed for the pseudo random generators
-    :param device: Device (cpu, cuda, ...) on which the code should be run.
-        Setting it to auto, the code will be run on the GPU if possible.
-    :param _init_setup_model: Whether or not to build the network at the creation of the instance
-    """
-
+class Q(BaseAlgorithm):
     policy_aliases: Dict[str, Type[BasePolicy]] = {
         "MlpPolicy": MlpPolicy,
     }
 
-    def __init__(
-        self,
-        policy: Union[str, Type[QPolicy]],
-        env: Union[GymEnv, str],
-        learning_rate: Union[float, Schedule] = 1e-4,
-        buffer_size: int = 1,  # 1e6
-        learning_starts: int = 0,
-        batch_size: int = 1,
-        tau: float = 1.0,
-        gamma: float = 0.99,
-        train_freq: Union[int, Tuple[int, str]] = 1,
-        gradient_steps: int = 1,
-        replay_buffer_class: Optional[Type[ReplayBuffer]] = None,
-        replay_buffer_kwargs: Optional[Dict[str, Any]] = None,
-        optimize_memory_usage: bool = False,
-        target_update_interval: int = 10000,
-        exploration_fraction: float = 0.1,
-        exploration_initial_eps: float = 1.0,
-        exploration_final_eps: float = 0.05,
-        tensorboard_log: Optional[str] = None,
-        policy_kwargs: Optional[Dict[str, Any]] = None,
-        verbose: int = 0,
-        seed: Optional[int] = None,
-        device: Union[th.device, str] = "auto",
-        _init_setup_model: bool = True,
+    def __init__(self,
+        env: Union[GymEnv, str], learning_rate: Union[float, Schedule] = 1e-4, gamma: float = 0.99,
+        exploration_fraction: float = 0.1, exploration_initial_eps: float = 1.0, exploration_final_eps: float = 0.05,
+        tensorboard_log: Optional[str] = None, verbose: int = 0, seed: Optional[int] = None, _init_setup_model: bool = True
     ) -> None:
-        super().__init__(
-            policy,
-            env,
-            learning_rate,
-            buffer_size,
-            learning_starts,
-            batch_size,
-            tau,
-            gamma,
-            train_freq,
-            gradient_steps,
-            action_noise=None,  # No action noise
-            replay_buffer_class=replay_buffer_class,
-            replay_buffer_kwargs=replay_buffer_kwargs,
-            policy_kwargs=policy_kwargs,
-            tensorboard_log=tensorboard_log,
-            verbose=verbose,
-            device=device,
-            seed=seed,
-            sde_support=False,
-            optimize_memory_usage=optimize_memory_usage,
-            supported_action_spaces=(spaces.Discrete,),
-            support_multi_env=True,
-        )
+        super().__init__('MlpPolicy', env, learning_rate, tensorboard_log=tensorboard_log, verbose=verbose, seed=seed, supported_action_spaces=(spaces.Discrete,))
 
         self.exploration_initial_eps = exploration_initial_eps
         self.exploration_final_eps = exploration_final_eps
         self.exploration_fraction = exploration_fraction
-        self.target_update_interval = target_update_interval
+        self.gamma = gamma
+
+        self._last_actions = None # type: np.ndarray
+        self._last_rewards = None # type: np.ndarray
+        self._next_obs = None # type: np.ndarray
+
+        self.q_table = np.zeros((16, 4))
+
         # For updating the target network with multiple envs:
         self._n_calls = 0
         # "epsilon" for the epsilon-greedy exploration
@@ -140,89 +65,174 @@ class Q(OffPolicyAlgorithm):
     def _on_step(self) -> None:
         self._n_calls += 1
 
-        self.exploration_rate = self.exploration_schedule(self._current_progress_remaining)
+        self.exploration_rate = 0.2
 
         self.logger.record("rollout/exploration_rate", self.exploration_rate)
 
     def _get_sars(self):
-        replay_data = self.replay_buffer.sample(1, env=self._vec_normalize_env)
         state = self._last_obs.item()
-        action = replay_data.actions[0].item()
-        reward = replay_data.rewards[0].item()
-        next_state = replay_data.next_observations[0].item()
+        action = self._last_actions.item()
+        reward = self._last_rewards.item()
+        next_state = self._next_obs.item()
 
         return state, action, reward, next_state
 
-    def train(self, gradient_steps: int, batch_size: int) -> None:
-        s, a, r, sp = self._get_sars()
-        
-        q_old = self.policy.q_table[s, a]
-        target = r + self.gamma * np.max(self.policy.q_table[sp])
-        q_new = q_old + self.learning_rate * (target - q_old)
+    def train(self) -> None:
+        current_state, action, reward, next_state = self._get_sars()
+        lr = self.learning_rate
+        gamma = self.gamma
+        q_new = (1-lr)*self.q_table[current_state, action] + lr*(reward + gamma*max(self.q_table[next_state,:]))
 
-        self.policy.q_table[s, a] = q_new
+        # print(q_new)
 
-    def predict(
-        self,
-        observation: Union[np.ndarray, Dict[str, np.ndarray]],
-        state: Optional[Tuple[np.ndarray, ...]] = None,
-        episode_start: Optional[np.ndarray] = None,
-        deterministic: bool = False,
-    ) -> Tuple[np.ndarray, Optional[Tuple[np.ndarray, ...]]]:
+        # print(self.q_table)
+
+        self.q_table[current_state, action] = q_new
+        # q_old = self.policy.q_table[s, a]
+        # target = r + self.gamma * np.max(self.policy.q_table[sp])
+        # q_new = q_old + self.learning_rate * (target - q_old)
+
+        # self.policy.q_table[s, a] = q_new
+
+        # print(s, a, r, sp)
+
+    def learn(self: Q,
+        total_timesteps: int, callback: MaybeCallback = None, log_interval: int = 4, tb_log_name: str = "Q",
+        reset_num_timesteps: bool = True, progress_bar: bool = False
+    ) -> Q:
+        total_timesteps, callback = self._setup_learn(
+            total_timesteps, callback, reset_num_timesteps, tb_log_name, progress_bar
+        )
+
+        callback.on_training_start(locals(), globals())
+
+        while self.num_timesteps < total_timesteps:
+            rollout = self.collect_rollouts(self.env, callback=callback, log_interval=log_interval)
+
+            if rollout.continue_training is False:
+                break
+
+            self.train()
+
+        callback.on_training_end()
+
+        return self
+
+
+    def predict(self, observation: np.ndarray, deterministic: bool = False) -> np.ndarray:
         """
         Overrides the base_class predict function to include epsilon-greedy exploration.
 
         :param observation: the input observation
-        :param state: The last states (can be None, used in recurrent policies)
-        :param episode_start: The last masks (can be None, used in recurrent policies)
         :param deterministic: Whether or not to return deterministic actions.
         :return: the model's action and the next state
             (used in recurrent policies)
         """
 
-        if not deterministic and np.random.rand() < self.exploration_rate:
+        if np.random.uniform(0,1) < 0.2:
             action = np.array([self.action_space.sample()])
         else:
-            action, state = self.policy.predict(observation, deterministic)
+            action = np.argmax(self.q_table[observation,:])
 
-        return action, state
+        # if not deterministic and np.random.rand() < self.exploration_rate:
+        #     action = np.array([self.action_space.sample()])
+        # else:
+        #     action = self.policy.predict(observation, deterministic)
 
-    def learn(
-        self: Q,
-        total_timesteps: int,
-        callback: MaybeCallback = None,
-        log_interval: int = 4,
-        tb_log_name: str = "Q",
-        reset_num_timesteps: bool = True,
-        progress_bar: bool = False,
-    ) -> Q:
-        return super().learn(
-            total_timesteps=total_timesteps,
-            callback=callback,
-            log_interval=log_interval,
-            tb_log_name=tb_log_name,
-            reset_num_timesteps=reset_num_timesteps,
-            progress_bar=progress_bar,
-        )
+        return action.reshape(-1)
 
-    def _sample_action(self, learning_starts, action_noise, n_envs) -> Tuple[np.ndarray, np.ndarray]:
-        action, _ = self.predict(self._last_obs, deterministic=False)
+    def collect_rollouts(
+        self,
+        env: VecEnv,
+        callback: BaseCallback,
+        log_interval: Optional[int] = None,
+    ) -> RolloutReturn:
+        assert isinstance(env, VecEnv), "You must pass a VecEnv"
 
-        return action, action
-    
+        callback.on_rollout_start()
+        continue_training = True
+
+        # Select action randomly or according to policy
+        actions = self.predict(self._last_obs, deterministic=False)
+
+        # Perform action
+        new_obs, rewards, dones, infos = env.step(actions)
+
+        self._last_actions = actions
+        self._last_rewards = rewards
+        self._next_obs = new_obs
+
+        self.num_timesteps += 1
+
+        # Give access to local variables
+        callback.update_locals(locals())
+
+        # Only stop training if return value is False, not when it is None.
+        if callback.on_step() is False:
+            return RolloutReturn(0, 1, continue_training=False)
+
+        # Retrieve reward and episode length if using Monitor wrapper
+        self._update_info_buffer(infos, dones)
+        self._update_current_progress_remaining(self.num_timesteps, self._total_timesteps)
+        self._on_step()
+
+        done = dones.item()
+
+        if done:
+            self._episode_num += 1
+
+            # Log training infos
+            if log_interval is not None and self._episode_num % log_interval == 0:
+                self._dump_logs()
+
+        callback.on_rollout_end()
+
+        return RolloutReturn(1, 1, continue_training)         
+
+    def _dump_logs(self) -> None:
+        time_elapsed = max((time.time_ns() - self.start_time) / 1e9, sys.float_info.epsilon)
+        fps = int((self.num_timesteps - self._num_timesteps_at_start) / time_elapsed)
+        self.logger.record("time/episodes", self._episode_num, exclude="tensorboard")
+
+        if len(self.ep_info_buffer) > 0 and len(self.ep_info_buffer[0]) > 0:
+            self.logger.record("rollout/ep_rew_mean", safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]))
+            self.logger.record("rollout/ep_len_mean", safe_mean([ep_info["l"] for ep_info in self.ep_info_buffer]))
+        
+        self.logger.record("time/fps", fps)
+        self.logger.record("time/time_elapsed", int(time_elapsed), exclude="tensorboard")
+        self.logger.record("time/total_timesteps", self.num_timesteps, exclude="tensorboard")
+
+        if len(self.ep_success_buffer) > 0:
+            self.logger.record("rollout/success_rate", safe_mean(self.ep_success_buffer))
+
+        # Pass the number of timesteps for tensorboard
+        self.logger.dump(step=self.num_timesteps)
+
 import gym
 
 class CustomCallback(BaseCallback):
-    rewards = []
+    def __init__(self, verbose: int = 0):
+        super().__init__(verbose)
+
+        self.episode_rewards = []
+        self.total_rewards = []
 
     def _on_step(self) -> bool:
-        self.rewards.append(self.locals['rewards'].item())
+        reward = self.locals['rewards'].item()
+        done = self.locals['dones'].item()
+
+        self.episode_rewards.append(reward)
+
+        if done:
+            self.total_rewards.append(sum(self.episode_rewards))
+            self.episode_rewards = []
 
         if self.n_calls % 100 == 0 and self.n_calls > 0:
-            print(np.mean(self.rewards[-100:]))
+            print(self.num_timesteps, np.mean(self.total_rewards[-100:]))
 
 callback = CustomCallback()
+env = gym.make('FrozenLake-v1')
+env = TimeLimit(env, 100)
+model = Q(env, learning_rate=0.1)
 
-model = Q('MlpPolicy', gym.make('FrozenLake-v1'), exploration_final_eps=0.2, exploration_fraction=0)
-
-model.learn(50000, callback=callback)
+model.learn(100000, callback=callback)

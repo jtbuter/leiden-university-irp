@@ -47,7 +47,7 @@ for e in range(n_episodes):
     exploration_proba = max(min_exploration_proba, np.exp(-exploration_decreasing_decay*e))
     total_rewards_episode.append(total_episode_reward)
 
-    if e % 100 == 0 and e > 0:
+    if n_timesteps % 100 == 0 and n_timesteps > 0:
         mean_reward = np.mean(total_rewards_episode[-100:])
 
         print(n_timesteps, mean_reward)
