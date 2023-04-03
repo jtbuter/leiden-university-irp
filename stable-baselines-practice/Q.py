@@ -4,6 +4,8 @@ import time
 import sys
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
+from copy import deepcopy
+
 import numpy as np
 import torch as th
 import gym
@@ -73,6 +75,8 @@ class Q(BaseAlgorithm):
         self.done = self.done.item()
         self.info = self.info[0]
 
+        temp_next_state = deepcopy(self.next_state)
+
         if self.done:
             self.next_state = self.info['terminal_observation']
 
@@ -80,28 +84,25 @@ class Q(BaseAlgorithm):
         self.Q_table[self.current_state, self.action] = q_value
         self.total_episode_reward += self.reward
 
-        self.current_state = self.next_state
+        self.next_state = temp_next_state
 
     def learn(self, total_timesteps, callback):
         self.callback = callback
         self.current_state = self.env.reset().item()
-
-        timesteps = 0
 
         while self.n_timesteps < total_timesteps:
             self.train()
         
             callback._on_step()
 
-            timesteps += 1
+            self.current_state = self.next_state
 
             # If the episode is finished, we leave the for loop
             if self.done:
-                self.current_state = self.env.reset().item()
+                # self.current_state = self.env.reset().item()
                 self.callback.rewards.append(self.total_episode_reward)
                 self.total_episode_reward = 0
                 self.num_episode += 1
-                timesteps = 0
 
 class CustomCallback(BaseCallback):
     def __init__(self, verbose: int = 0):
