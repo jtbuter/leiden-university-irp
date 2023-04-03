@@ -9,7 +9,7 @@ n_actions = env.action_space.n
 
 Q_table = np.zeros((n_observations, n_actions))
 
-n_episodes = 10000
+max_n_timesteps = 100000
 max_iter_episode = 100
 exploration_proba = 1
 exploration_decreasing_decay = 0
@@ -19,38 +19,40 @@ lr = 0.1
 
 total_rewards_episode = []
 n_timesteps = 0
+num_episode = 0
+
+current_state = env.reset()
 
 #we iterate over episodes
-for e in range(n_episodes):
-    current_state = env.reset()
+while n_timesteps < max_n_timesteps:
     done = False
     total_episode_reward = 0
 
-    for i in range(max_iter_episode):
-        n_timesteps += 1
+    n_timesteps += 1
 
-        if np.random.uniform(0,1) < 0.2:
-            action = env.action_space.sample()
-        else:
-            action = np.argmax(Q_table[current_state,:])
+    if np.random.uniform(0, 1) < 0.2:
+        action = env.action_space.sample()
+    else:
+        action = np.argmax(Q_table[current_state,:])
 
-        next_state, reward, done, _ = env.step(action)
+    next_state, reward, done, _ = env.step(action)
 
-        Q_table[current_state, action] = (1-lr) * Q_table[current_state, action] +lr*(reward + gamma*max(Q_table[next_state,:]))
-        total_episode_reward += reward
+    Q_table[current_state, action] = (1-lr) * Q_table[current_state, action] +lr*(reward + gamma*max(Q_table[next_state,:]))
+    total_episode_reward += reward
 
-        # If the episode is finished, we leave the for loop
-        if done:
-            break
-        current_state = next_state
+    # If the episode is finished, we leave the for loop
+    if done:
+        total_rewards_episode.append(total_episode_reward)
+        num_episode += 1
 
-    exploration_proba = max(min_exploration_proba, np.exp(-exploration_decreasing_decay*e))
-    total_rewards_episode.append(total_episode_reward)
+        next_state = env.reset()
 
-    if n_timesteps % 100 == 0 and n_timesteps > 0:
+    current_state = next_state
+
+    if n_timesteps % 1000 == 0 and n_timesteps > 0:
         mean_reward = np.mean(total_rewards_episode[-100:])
 
         print(n_timesteps, mean_reward)
 
         logger.record('reward', mean_reward)
-        logger.dump(step = e)
+        logger.dump(step = num_episode)
