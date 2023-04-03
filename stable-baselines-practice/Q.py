@@ -71,6 +71,9 @@ class Q(BaseAlgorithm):
 
         self.num_timesteps += 1
 
+        self._update_info_buffer(info, reward)
+        self._update_current_progress_remaining(self.num_timesteps, self._total_timesteps)
+
         current_state = deepcopy(self._last_obs)
         next_state = next_state.item()
         reward = reward.item()
@@ -81,6 +84,9 @@ class Q(BaseAlgorithm):
         if done:
             new_state = info['terminal_observation']
             self._episode_num += 1
+
+            if log_interval is not None and self._episode_num % log_interval == 0:
+                self._dump_logs()
 
         self.rollout = current_state, action, reward, new_state, done
         self._last_obs = next_state
@@ -130,7 +136,6 @@ class Q(BaseAlgorithm):
 
         return total_timesteps, callback
 
-
     def _dump_logs(self) -> None:
         """
         Write log.
@@ -138,17 +143,18 @@ class Q(BaseAlgorithm):
         time_elapsed = max((time.time_ns() - self.start_time) / 1e9, sys.float_info.epsilon)
         fps = int((self.num_timesteps - self._num_timesteps_at_start) / time_elapsed)
         self.logger.record("time/episodes", self._episode_num, exclude="tensorboard")
+
         if len(self.ep_info_buffer) > 0 and len(self.ep_info_buffer[0]) > 0:
             self.logger.record("rollout/ep_rew_mean", safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]))
             self.logger.record("rollout/ep_len_mean", safe_mean([ep_info["l"] for ep_info in self.ep_info_buffer]))
+        
         self.logger.record("time/fps", fps)
         self.logger.record("time/time_elapsed", int(time_elapsed), exclude="tensorboard")
         self.logger.record("time/total_timesteps", self.num_timesteps, exclude="tensorboard")
-        if self.use_sde:
-            self.logger.record("train/std", (self.actor.get_std()).mean().item())
 
         if len(self.ep_success_buffer) > 0:
             self.logger.record("rollout/success_rate", safe_mean(self.ep_success_buffer))
+
         # Pass the number of timesteps for tensorboard
         self.logger.dump(step=self.num_timesteps)
 
@@ -175,8 +181,8 @@ class CustomCallback(BaseCallback):
 callback = CustomCallback()
 env = gym.make('FrozenLake-v1')
 env = TimeLimit(env, 100)
-model = Q(env, learning_rate=0.1, gamma=0.99)
+model = Q(env, learning_rate=0.1, gamma=0.99, tensorboard_log="logs")
 
-model.learn(100000, callback=callback)
+model.learn(100000, callback=callback, log_interval=1)
 
 print(model.q_table)
