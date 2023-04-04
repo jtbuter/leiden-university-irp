@@ -30,8 +30,13 @@ class Q(BaseAlgorithm):
     }
 
     def __init__(
-        self, env: Union[GymEnv, str], learning_rate: Union[float, Schedule],
-        gamma: float = 0.99, tensorboard_log: Optional[str] = None,
+        self, env: Union[GymEnv, str],
+        learning_rate: Union[float, Schedule],
+        gamma: float = 0.99,
+        exploration_fraction: float = 0.1,
+        exploration_initial_eps: float = 1.0,
+        exploration_final_eps: float = 0.05,
+        tensorboard_log: Optional[str] = None,
         verbose: int = 0, monitor_wrapper: bool = True, seed: Optional[int] = None,
         supported_action_spaces: Optional[Tuple[spaces.Space, ...]] = None,
     ):
@@ -42,20 +47,45 @@ class Q(BaseAlgorithm):
         )
 
         self.gamma = gamma
-
+        self.exploration_rate = 0.0
+        self.exploration_initial_eps = exploration_initial_eps
+        self.exploration_final_eps = exploration_final_eps
+        self.exploration_fraction = exploration_fraction
+        
         self._setup_model()
 
+    def _get_dims(self, *args):
+        dims = tuple()
+
+        for space in args:
+            if isinstance(space, spaces.MultiDiscrete):
+                dims += tuple(space.nvec)
+            else:
+                dims += (space.n,)
+
+        return dims
+
     def _setup_model(self) -> None:
-        self.q_table = np.zeros((self.observation_space.n, self.action_space.n))
+        dims = self._get_dims(self.observation_space, self.action_space)
+        self.q_table = np.zeros(dims)
         self.rollout = None
+        self.exploration_schedule = get_linear_fn(
+            self.exploration_initial_eps,
+            self.exploration_final_eps,
+            self.exploration_fraction,
+        )
 
     def predict(self, observation, deterministic: bool = False):
-        if not deterministic and np.random.uniform(0,1) < 0.2:
+        if not deterministic and np.random.rand() < self.exploration_rate:
             action = self.action_space.sample()
         else:
             action = np.argmax(self.q_table[observation,:])
 
         return action
+
+    def _on_step(self):
+        self.exploration_rate = self.exploration_schedule(self._current_progress_remaining)
+        self.logger.record("rollout/exploration_rate", self.exploration_rate)
 
     def collect_rollouts(self, callback: BaseCallback, log_interval: Optional[int] = None) -> RolloutReturn:
         callback.on_rollout_start()
@@ -73,6 +103,8 @@ class Q(BaseAlgorithm):
 
         self._update_info_buffer(info, reward)
         self._update_current_progress_remaining(self.num_timesteps, self._total_timesteps)
+
+        self._on_step()
 
         current_state = deepcopy(self._last_obs)
         next_state = next_state.item()
@@ -96,9 +128,11 @@ class Q(BaseAlgorithm):
     def train(self):
         current_state, action, reward, next_state, done = self.rollout
 
-        q_value = (1-self.learning_rate) * self.q_table[current_state, action] + self.learning_rate*(reward + self.gamma*max(self.q_table[next_state,:]))
+        q_old = self.q_table[current_state, action]
+        target = reward + self.gamma * max(self.q_table[next_state,:])
+        q_new = q_old + self.learning_rate * (target - q_old)
         
-        self.q_table[current_state, action] = q_value
+        self.q_table[current_state, action] = q_new
 
     def learn(
         self, total_timesteps: int, callback: MaybeCallback = None, log_interval: int = 1,
@@ -137,11 +171,9 @@ class Q(BaseAlgorithm):
         return total_timesteps, callback
 
     def _dump_logs(self) -> None:
-        """
-        Write log.
-        """
         time_elapsed = max((time.time_ns() - self.start_time) / 1e9, sys.float_info.epsilon)
         fps = int((self.num_timesteps - self._num_timesteps_at_start) / time_elapsed)
+
         self.logger.record("time/episodes", self._episode_num, exclude="tensorboard")
 
         if len(self.ep_info_buffer) > 0 and len(self.ep_info_buffer[0]) > 0:
@@ -157,7 +189,6 @@ class Q(BaseAlgorithm):
 
         # Pass the number of timesteps for tensorboard
         self.logger.dump(step=self.num_timesteps)
-
 
 class CustomCallback(BaseCallback):
     def __init__(self, verbose: int = 0):
@@ -178,11 +209,31 @@ class CustomCallback(BaseCallback):
         if self.n_calls % 1000 == 0:
             print(self.n_calls, np.mean(self.rewards[-100:]))
 
+from env import UltraSoundEnv, BinaryUltraSoundEnv
+import utils
+
+image = utils.read_image("/home/joel/Documents/leiden/introductory_research_project/data/trus/images/case10_11.png")
+label = utils.read_image("/home/joel/Documents/leiden/introductory_research_project/data/trus/labels/case10_11.png")
+subimages, coords = utils.extract_subimages(image, 64, 64)
+sublabels, coords = utils.extract_subimages(label, 64, 64)
+
+subimage = subimages[36]
+sublabel = sublabels[36]
+
+env = BinaryUltraSoundEnv(subimage, sublabel)
+
+exploration_fraction = 0.6
 callback = CustomCallback()
-env = gym.make('FrozenLake-v1')
-env = TimeLimit(env, 100)
-model = Q(env, learning_rate=0.1, gamma=0.99, tensorboard_log="logs")
+# env = gym.make('FrozenLake-v1')
+# env = TimeLimit(env, 100)
+model = Q(
+    env,
+    learning_rate=0.1,
+    gamma=0.95,
+    exploration_fraction=exploration_fraction,
+    tensorboard_log="logs"
+)
 
-model.learn(100000, callback=callback, log_interval=1)
+# model.learn(100000, callback=callback, log_interval=1, tb_log_name=f"run-{exploration_fraction}")
 
-print(model.q_table)
+# print(model.q_table)

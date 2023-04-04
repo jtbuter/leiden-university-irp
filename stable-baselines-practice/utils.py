@@ -1,21 +1,21 @@
 import numpy as np
 import cv2
 
-def _process_thresholds(action, action_map, tis, n_thresholds):
+def process_thresholds(action, action_map, tis, n_thresholds):
     return np.clip(tis + action_map[action], 0, n_thresholds - 1)
 
 
-def _compute_dissimilarity(bit_mask, label):
+def compute_dissimilarity(bit_mask, label):
     height, width = label.shape
 
     return np.sum(np.logical_xor(bit_mask, label)) / (height * width)
 
 
-def _read_image(path):
+def read_image(path):
     return cv2.imread(path, cv2.IMREAD_GRAYSCALE)
 
 
-def _extract_subimages(image, subimage_width, subimage_height):
+def extract_subimages(image, subimage_width, subimage_height):
     height, width = image.shape
     subimages, coords = [], []
 
