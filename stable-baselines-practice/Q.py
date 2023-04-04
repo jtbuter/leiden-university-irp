@@ -54,19 +54,9 @@ class Q(BaseAlgorithm):
         
         self._setup_model()
 
-    def _get_dims(self, *args):
-        dims = tuple()
-
-        for space in args:
-            if isinstance(space, spaces.MultiDiscrete):
-                dims += tuple(space.nvec)
-            else:
-                dims += (space.n,)
-
-        return dims
-
     def _setup_model(self) -> None:
-        dims = self._get_dims(self.observation_space, self.action_space)
+        dims = utils.get_dims(self.observation_space, self.action_space)
+        
         self.q_table = np.zeros(dims)
         self.rollout = None
         self.exploration_schedule = get_linear_fn(
@@ -209,7 +199,7 @@ class CustomCallback(BaseCallback):
         if self.n_calls % 1000 == 0:
             print(self.n_calls, np.mean(self.rewards[-100:]))
 
-from env import UltraSoundEnv, BinaryUltraSoundEnv
+from env import UltraSoundEnv, PaperUltraSoundEnv
 import utils
 
 image = utils.read_image("/home/joel/Documents/leiden/introductory_research_project/data/trus/images/case10_11.png")
@@ -220,7 +210,7 @@ sublabels, coords = utils.extract_subimages(label, 64, 64)
 subimage = subimages[36]
 sublabel = sublabels[36]
 
-env = BinaryUltraSoundEnv(subimage, sublabel)
+env = PaperUltraSoundEnv(subimage, sublabel)
 
 exploration_fraction = 0.6
 callback = CustomCallback()
