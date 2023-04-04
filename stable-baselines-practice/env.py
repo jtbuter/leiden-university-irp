@@ -13,10 +13,10 @@ class UltraSoundEnv(gym.Env):
 
         self.label = label.copy()
         self.sample = sample.copy()
-        self.state = self.sample.reshape(*self.sample.shape, 1)
+        self.state = None
 
         self.action_space = gym.spaces.Discrete(n = 4)
-        self.observation_space = gym.spaces.Box(0, 255, self.state.shape, np.uint8)
+        self.observation_space = gym.spaces.Box(0, 255, self.sample.shape + (1,), np.uint8)
 
         self.num_thresholds = num_thresholds
         self.threshold_ids = np.array([0, self.num_thresholds - 1])
@@ -68,25 +68,7 @@ class PaperUltraSoundEnv(UltraSoundEnv):
     def __init__(self, sample = None, label = None, num_thresholds = 10):
         super().__init__(sample, label, num_thresholds)
 
-        self.state = None
-        self._state_bins = None
-        self.observation_space = gym.spaces.MultiDiscrete((35, 35, 35))
-
-        self._setup_env()
-
-    def _setup_env(self):
-        height, width = self.label.shape
-        low = {
-            'area': 0., 'compactness': 0., 'objects': 0.
-        }
-        high = {
-            'area': 1., 'compactness': 1., 'objects': np.ceil(width / 2) * np.ceil(height / 2)
-        }
-        bins = dict(zip(low.keys(), utils.get_dims(self.observation_space)))
-
-        self._state_bins = np.asarray([
-            np.linspace(low[key], high[key], bins[key] + 1)[1:-1] for key in low
-        ])
+        self.observation_space = gym.spaces.Box(0, np.inf, (3,))        
 
     def step(self, action):
         # Convert an action to new threshold indices
@@ -110,7 +92,7 @@ class PaperUltraSoundEnv(UltraSoundEnv):
         self.threshold_ids = new_threshold_ids
         self.state = next_state
 
-        return np.asarray(self.state), reward, is_done, {}
+        return np.asarray(self.state, dtype=np.float32), reward, is_done, {}
 
     def reset(self):
         # Pick two random new threshold indices
@@ -132,28 +114,54 @@ class PaperUltraSoundEnv(UltraSoundEnv):
         self.threshold_ids = new_threshold_ids
         self.state = next_state
 
-        return np.asarray(self.state)
+        return np.asarray(self.state, dtype=np.float32)
         
     def observation(self, bit_mask):
         contours = utils.get_contours(bit_mask)
         num_objects = len(contours)
 
         if num_objects == 0:
-            return utils.discretize((0, 0, 0), self._state_bins)
+            return (0., 0., 0.)
 
         # Get the biggest object based on its area
         biggest_object = max(contours, key = cv2.contourArea)
         object_area = utils.get_area(biggest_object)
 
         if object_area == 0:
-            return utils.discretize((0, 0, num_objects), self._state_bins)
+            return (0., 0., num_objects)
 
         compactness = utils.get_compactness(biggest_object, object_area)
         normalized_area = utils.normalize_area(bit_mask, object_area)
 
-        return utils.discretize(
-            (normalized_area, compactness, num_objects), self._state_bins
-        )
+        return (normalized_area, compactness, num_objects)
+
+class Discretize(gym.Env):
+    def __init__(self, env, lows, highs, bins):
+        self.env = env
+        self.observation_space = gym.spaces.MultiDiscrete(bins)
+        self.action_space = env.action_space
+
+        self._state_bins = None
+
+        self._setup_env(lows, highs)
+
+    def _setup_env(self, lows, highs):
+        keys = lows.keys()
+        bins = dict(zip(keys, utils.get_dims(self.observation_space)))
+
+        self._state_bins = np.asarray([
+            np.linspace(lows[key], highs[key], bins[key] + 1)[1:-1] for key in keys
+        ])
+
+    def step(self, action):
+        state, reward, done, info = self.env.step(action)
+
+        return np.asarray(utils.discretize(state, self._state_bins)), reward, done, info
+
+    def reset(self):
+        state = self.env.reset()
+
+        return np.asarray(utils.discretize(state, self._state_bins))
 
 if __name__ == "__main__":
     image = utils.read_image("/home/joel/Documents/leiden/introductory_research_project/data/trus/images/case10_11.png")
@@ -167,25 +175,20 @@ if __name__ == "__main__":
     trus_env = UltraSoundEnv(subimage, sublabel)
     paper_env = PaperUltraSoundEnv(subimage, sublabel)
 
-    for i in range(20):
-        paper_state = paper_env.reset()
+    height, width = sublabel.shape
+    lows = {'area': 0., 'compactness': 0., 'objects': 0.}
+    highs = {'area': 1., 'compactness': 1., 'objects': np.ceil(width / 2) * np.ceil(height / 2)}
+    bins = (35, 35, 35)
 
-        # Pick two random new threshold indices
-        new_threshold_ids = paper_env.threshold_ids
+    discrete_env = Discretize(paper_env, lows, highs, bins)
 
-        # Convert indices to gray-values for generalization
-        lt, rt = paper_env.thresholds[new_threshold_ids]
+    paper_env_state = paper_env.reset()
+    paper_env_sample = paper_env.observation_space.sample()
 
-        # Extract a bit-mask using the gray-values
-        bit_mask = cv2.inRange(paper_env.sample, int(lt), int(rt))
-
-        plt.title(str(paper_env.threshold_ids) + ' ' + str(paper_state))
-        plt.imshow(np.hstack([sublabel, bit_mask]), cmap='gray')
-        plt.show()
-
-    check_envs = False
+    check_envs = True
 
     # Check if we're using valid gym environments
     if check_envs:
         env_checker.check_env(trus_env)
         env_checker.check_env(paper_env)
+        env_checker.check_env(discrete_env)

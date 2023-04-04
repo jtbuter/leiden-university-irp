@@ -10,10 +10,10 @@ import numpy as np
 import torch as th
 import gym
 from gym import spaces
-from gym.wrappers import TimeLimit
 from torch.nn import functional as F
 
-from stable_baselines3.common import utils
+import utils
+
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.policies import BasePolicy
@@ -56,7 +56,7 @@ class Q(BaseAlgorithm):
 
     def _setup_model(self) -> None:
         dims = utils.get_dims(self.observation_space, self.action_space)
-        
+
         self.q_table = np.zeros(dims)
         self.rollout = None
         self.exploration_schedule = get_linear_fn(
@@ -97,9 +97,9 @@ class Q(BaseAlgorithm):
         self._on_step()
 
         current_state = deepcopy(self._last_obs)
-        next_state = next_state.item()
-        reward = reward.item()
-        done = done.item()
+        next_state = next_state[0]
+        reward = reward[0]
+        done = done[0]
         info = info[0]
         new_state = next_state
 
@@ -156,7 +156,7 @@ class Q(BaseAlgorithm):
             total_timesteps, callback, reset_num_timesteps, tb_log_name, progress_bar
         )
 
-        self._last_obs = self._last_obs.item()
+        self._last_obs = self._last_obs[0]
 
         return total_timesteps, callback
 
@@ -179,51 +179,3 @@ class Q(BaseAlgorithm):
 
         # Pass the number of timesteps for tensorboard
         self.logger.dump(step=self.num_timesteps)
-
-class CustomCallback(BaseCallback):
-    def __init__(self, verbose: int = 0):
-        super().__init__(verbose)
-
-        self.rewards = []
-        self.total_episode_reward = 0
-
-    def _on_step(self) -> bool:
-        reward, done = self.locals['reward'].item(), self.locals['done'].item()
-
-        self.total_episode_reward += reward
-
-        if done:
-            self.rewards.append(self.total_episode_reward)
-            self.total_episode_reward = 0
-
-        if self.n_calls % 1000 == 0:
-            print(self.n_calls, np.mean(self.rewards[-100:]))
-
-from env import UltraSoundEnv, PaperUltraSoundEnv
-import utils
-
-image = utils.read_image("/home/joel/Documents/leiden/introductory_research_project/data/trus/images/case10_11.png")
-label = utils.read_image("/home/joel/Documents/leiden/introductory_research_project/data/trus/labels/case10_11.png")
-subimages, coords = utils.extract_subimages(image, 64, 64)
-sublabels, coords = utils.extract_subimages(label, 64, 64)
-
-subimage = subimages[36]
-sublabel = sublabels[36]
-
-env = PaperUltraSoundEnv(subimage, sublabel)
-
-exploration_fraction = 0.6
-callback = CustomCallback()
-# env = gym.make('FrozenLake-v1')
-# env = TimeLimit(env, 100)
-model = Q(
-    env,
-    learning_rate=0.1,
-    gamma=0.95,
-    exploration_fraction=exploration_fraction,
-    tensorboard_log="logs"
-)
-
-# model.learn(100000, callback=callback, log_interval=1, tb_log_name=f"run-{exploration_fraction}")
-
-# print(model.q_table)
