@@ -1,3 +1,4 @@
+from wrapper import ExpandDimsWrapper
 from env import UltraSoundEnv, PaperUltraSoundEnv, Discretize
 from gym.wrappers import TimeLimit
 from Q import Q
@@ -23,6 +24,9 @@ bins = (35, 35, 35)
 # env = Discretize(env, lows, highs, bins)
 env = gym.make('FrozenLake-v1')
 env = TimeLimit(env, 150)
+env = ExpandDimsWrapper(env)
+
+print(env.reset())
 
 exploration_fraction = 0.1
 exploration_rate = 0.05

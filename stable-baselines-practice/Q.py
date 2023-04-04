@@ -46,6 +46,8 @@ class Q(BaseAlgorithm):
             seed=seed, supported_action_spaces=(spaces.Discrete,)
         )
 
+        assert len(env.observation_space.shape) > 0, "State space too small, wrap in an ExpandDimsWrapper"
+
         self.gamma = gamma
         self.exploration_rate = 0.0
         self.exploration_initial_eps = exploration_initial_eps
@@ -69,7 +71,7 @@ class Q(BaseAlgorithm):
         if not deterministic and np.random.rand() < self.exploration_rate:
             action = self.action_space.sample()
         else:
-            action = np.argmax(self.q_table[observation,:])
+            action = np.argmax(self.q_table[tuple(observation)])
 
         return action
 
@@ -118,11 +120,12 @@ class Q(BaseAlgorithm):
     def train(self):
         current_state, action, reward, next_state, done = self.rollout
 
-        q_old = self.q_table[current_state, action]
-        target = reward + self.gamma * max(self.q_table[next_state,:])
+        q_old = self.q_table[tuple(current_state)][action]
+
+        target = reward + self.gamma * max(self.q_table[tuple(next_state)])
         q_new = q_old + self.learning_rate * (target - q_old)
-        
-        self.q_table[current_state, action] = q_new
+
+        self.q_table[tuple(current_state)][action] = q_new
 
     def learn(
         self, total_timesteps: int, callback: MaybeCallback = None, log_interval: int = 1,

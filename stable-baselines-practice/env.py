@@ -4,6 +4,7 @@ import cv2
 import matplotlib.pyplot as plt
 import utils
 from stable_baselines3.common import env_checker
+from wrapper import ExpandDimsWrapper
 
 class UltraSoundEnv(gym.Env):
     action_map = np.array([(-1, -1), (-1, 1), (1, -1), (1, 1)])
@@ -174,6 +175,11 @@ if __name__ == "__main__":
 
     trus_env = UltraSoundEnv(subimage, sublabel)
     paper_env = PaperUltraSoundEnv(subimage, sublabel)
+
+    lake_env = gym.make('FrozenLake-v1')
+    expand_dims = ExpandDimsWrapper(lake_env)
+
+    assert np.array([lake_env.reset()]).shape == expand_dims.reset().shape
 
     height, width = sublabel.shape
     lows = {'area': 0., 'compactness': 0., 'objects': 0.}
