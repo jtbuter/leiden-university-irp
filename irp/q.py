@@ -1,5 +1,3 @@
-import traceback
-import warnings
 import time
 import sys
 from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
@@ -8,11 +6,9 @@ from copy import deepcopy
 
 import numpy as np
 import torch as th
-import gym
 from gym import spaces
 from torch.nn import functional as F
 
-import utils
 
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.buffers import ReplayBuffer
@@ -21,7 +17,8 @@ from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, RolloutReturn, Schedule, TrainFreq, TrainFrequencyUnit
 from stable_baselines3.common.utils import get_linear_fn, get_parameters_by_name, polyak_update, safe_mean
 from stable_baselines3.common.vec_env import VecEnv
-from QPolicy import QPolicy
+
+import irp.utils
 
 class Q(BaseAlgorithm):
 
@@ -57,7 +54,7 @@ class Q(BaseAlgorithm):
         self._setup_model()
 
     def _setup_model(self) -> None:
-        dims = utils.get_dims(self.observation_space, self.action_space)
+        dims = irp.utils.get_dims(self.observation_space, self.action_space)
 
         self.q_table = np.zeros(dims)
         self.rollout = None
