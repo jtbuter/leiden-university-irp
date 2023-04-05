@@ -9,7 +9,7 @@ class CustomCallback(BaseCallback):
         self.total_episode_reward = 0
 
     def _on_step(self) -> bool:
-        reward, done = self.locals['reward'].item(), self.locals['done'].item()
+        reward, done = self.locals['reward'], self.locals['done']
 
         self.total_episode_reward += reward
 
