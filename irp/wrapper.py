@@ -1,7 +1,7 @@
 import gym
 from stable_baselines3.common.vec_env import util
 import numpy as np
-import irp.utils
+from irp import utils
 
 class ExpandDimsWrapper(gym.Wrapper):
     def __init__(self, env):
@@ -30,7 +30,7 @@ class Discretize(gym.Wrapper):
 
     def _setup_env(self, lows, highs):
         keys = lows.keys()
-        bins = dict(zip(keys, irp.utils.get_dims(self.observation_space)))
+        bins = dict(zip(keys, utils.get_dims(self.observation_space)))
 
         self._state_bins = np.asarray([
             np.linspace(lows[key], highs[key], bins[key] + 1)[1:-1] for key in keys
@@ -39,9 +39,9 @@ class Discretize(gym.Wrapper):
     def step(self, action):
         state, reward, done, info = self.env.step(action)
 
-        return np.asarray(irp.utils.discretize(state, self._state_bins)), reward, done, info
+        return np.asarray(utils.discretize(state, self._state_bins)), reward, done, info
 
     def reset(self):
         state = self.env.reset()
 
-        return np.asarray(irp.utils.discretize(state, self._state_bins))
+        return np.asarray(utils.discretize(state, self._state_bins))

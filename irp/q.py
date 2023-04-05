@@ -18,7 +18,7 @@ from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Rollout
 from stable_baselines3.common.utils import get_linear_fn, get_parameters_by_name, polyak_update, safe_mean
 from stable_baselines3.common.vec_env import VecEnv
 
-import irp.utils
+from irp import utils
 
 class Q(BaseAlgorithm):
 
@@ -54,7 +54,7 @@ class Q(BaseAlgorithm):
         self._setup_model()
 
     def _setup_model(self) -> None:
-        dims = irp.utils.get_dims(self.observation_space, self.action_space)
+        dims = utils.get_dims(self.observation_space, self.action_space)
 
         self.q_table = np.zeros(dims)
         self.rollout = None

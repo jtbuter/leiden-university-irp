@@ -2,15 +2,15 @@ from irp.wrapper import ExpandDimsWrapper, Discretize
 from irp.env import UltraSoundEnv, PaperUltraSoundEnv
 from irp.q import Q
 from irp.callback import CustomCallback
-import irp.utils
+from irp import utils
 
 from gym.wrappers import TimeLimit
 import numpy as np
 
-image = irp.utils.read_image("/home/joel/Documents/leiden/introductory_research_project/data/trus/images/case10_11.png")
-label = irp.utils.read_image("/home/joel/Documents/leiden/introductory_research_project/data/trus/labels/case10_11.png")
-subimages, coords = irp.utils.extract_subimages(image, 64, 64)
-sublabels, coords = irp.utils.extract_subimages(label, 64, 64)
+image = utils.read_image("/home/joel/Documents/leiden/introductory_research_project/data/trus/images/case10_11.png")
+label = utils.read_image("/home/joel/Documents/leiden/introductory_research_project/data/trus/labels/case10_11.png")
+subimages, coords = utils.extract_subimages(image, 64, 64)
+sublabels, coords = utils.extract_subimages(label, 64, 64)
 
 subimage = subimages[36]
 sublabel = sublabels[36]
