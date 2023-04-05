@@ -68,14 +68,18 @@ class Q(BaseAlgorithm):
         )
 
     def predict(self, observation, deterministic: bool = False):
+        observation = tuple(observation)
+
+        # Perform ε-greedy action selection
         if not deterministic and np.random.rand() < self.exploration_rate:
             action = self.action_space.sample()
         else:
-            action = np.argmax(self.q_table[tuple(observation)])
+            action = np.argmax(self.q_table[observation])
 
         return action
 
     def _on_step(self):
+        # Get the exploration rate corresponding to the current timestep
         self.exploration_rate = self.exploration_schedule(self._current_progress_remaining)
         self.logger.record("rollout/exploration_rate", self.exploration_rate)
 
@@ -88,6 +92,7 @@ class Q(BaseAlgorithm):
 
         callback.update_locals(locals())
 
+        # Check if our callback makes us want to stop early
         if callback.on_step() is False:
             return RolloutReturn(1, 0, continue_training=False)
 
@@ -98,6 +103,7 @@ class Q(BaseAlgorithm):
 
         self._on_step()
 
+        # TODO: wrap deze code in een self-explanatory function?
         current_state = deepcopy(self._last_obs)
         next_state = next_state[0]
         reward = reward[0]
@@ -105,6 +111,9 @@ class Q(BaseAlgorithm):
         info = info[0]
         new_state = next_state
 
+        # VenEnv resets the environment when reaching a terminal state or truncating
+        # episodes, and returns this as the next state instead of the terminal state.
+        # However, the real terminal state is made accessible through info.
         if done:
             new_state = info['terminal_observation']
             self._episode_num += 1
@@ -112,6 +121,9 @@ class Q(BaseAlgorithm):
             if log_interval is not None and self._episode_num % log_interval == 0:
                 self._dump_logs()
 
+        # Current state moet altijd de next state uit self.action() worden,
+        # maar de next state voor het updaten van q-values is afhankelijk van
+        # of de episode beeindigd is.
         self.rollout = current_state, action, reward, new_state, done
         self._last_obs = next_state
 
@@ -120,30 +132,39 @@ class Q(BaseAlgorithm):
     def train(self):
         current_state, action, reward, next_state, done = self.rollout
 
-        q_old = self.q_table[tuple(current_state)][action]
+        # Cast states to tuples so they can be used for array indexing
+        current_state = tuple(current_state)
+        next_state = tuple(next_state)
 
-        target = reward + self.gamma * max(self.q_table[tuple(next_state)])
+        # Calculate the new q-values
+        q_old = self.q_table[current_state][action]
+        target = reward + self.gamma * max(self.q_table[next_state])
         q_new = q_old + self.learning_rate * (target - q_old)
 
-        self.q_table[tuple(current_state)][action] = q_new
+        # Update the Q-table
+        self.q_table[current_state][action] = q_new
 
     def learn(
         self, total_timesteps: int, callback: MaybeCallback = None, log_interval: int = 1,
         tb_log_name: str = "run", reset_num_timesteps: bool = True, progress_bar: bool = False,
     ):
+        # Resets the environment, sets-up callbacks and prepares tensorboard logging
         total_timesteps, callback = self._setup_learn(
             total_timesteps, callback, reset_num_timesteps,
             tb_log_name, progress_bar
         )
 
+        # Make local and global scope variables accessible to the callback
         callback.on_training_start(locals(), globals())
 
         while self.num_timesteps < total_timesteps:
+            # Perform a step in the environment and collect rewards
             rollout = self.collect_rollouts(callback, log_interval)
         
             if rollout.continue_training is False:
                 break
 
+            # Train on the collected data
             self.train()
 
         callback.on_training_end()
@@ -155,10 +176,12 @@ class Q(BaseAlgorithm):
         reset_num_timesteps: bool = True, tb_log_name: str = "run",
         progress_bar: bool = False
     ) -> Tuple[int, BaseCallback]:
+        # Resets the environment, sets-up callbacks and prepares tensorboard logging
         total_timesteps, callback = super()._setup_learn(
             total_timesteps, callback, reset_num_timesteps, tb_log_name, progress_bar
         )
 
+        # Always work with one environment, so we can extract the first observation
         self._last_obs = self._last_obs[0]
 
         return total_timesteps, callback

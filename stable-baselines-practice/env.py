@@ -4,12 +4,15 @@ import cv2
 import matplotlib.pyplot as plt
 import utils
 from stable_baselines3.common import env_checker
-from wrapper import ExpandDimsWrapper
+from wrapper import ExpandDimsWrapper, Discretize
 
 class UltraSoundEnv(gym.Env):
+    metadata = {
+        "render.modes": ['human'], "render_fps": 1
+    }
     action_map = np.array([(-1, -1), (-1, 1), (1, -1), (1, 1)])
 
-    def __init__(self, sample = None, label = None, num_thresholds = 10):
+    def __init__(self, sample = None, label = None, num_thresholds = 10, render_mode=None):
         super(UltraSoundEnv, self).__init__()
 
         self.label = label.copy()
@@ -24,6 +27,7 @@ class UltraSoundEnv(gym.Env):
         self.thresholds = np.linspace(np.min(sample), np.max(sample), num_thresholds, dtype = np.uint8)
 
         self.old_dissim = None
+        self.render_mode = render_mode
 
     def _get_reward(self, dissim):
         if dissim < self.old_dissim:
@@ -58,8 +62,16 @@ class UltraSoundEnv(gym.Env):
 
         return self.state
 
-    def render(self):
-        plt.imshow(np.squeeze(self.state), cmap = 'gray', vmin = 0, vmax = 1)
+    def render(self, mode = None):
+        # Threshold ids obtained after resetting or performing a step
+        lt, rt = self.thresholds[self.threshold_ids]
+
+        # Apply the thresholds
+        bit_mask = cv2.inRange(self.sample, int(lt), int(rt))
+        state = cv2.bitwise_and(self.sample, self.sample, mask = bit_mask)
+
+        # Show the final result
+        plt.imshow(np.hstack([self.label, state]), cmap = 'gray', vmin = 0, vmax = 1)
         plt.show()
 
     def close(self):
@@ -136,34 +148,6 @@ class PaperUltraSoundEnv(UltraSoundEnv):
 
         return (normalized_area, compactness, num_objects)
 
-class Discretize(gym.Env):
-    def __init__(self, env, lows, highs, bins):
-        self.env = env
-        self.observation_space = gym.spaces.MultiDiscrete(bins)
-        self.action_space = env.action_space
-
-        self._state_bins = None
-
-        self._setup_env(lows, highs)
-
-    def _setup_env(self, lows, highs):
-        keys = lows.keys()
-        bins = dict(zip(keys, utils.get_dims(self.observation_space)))
-
-        self._state_bins = np.asarray([
-            np.linspace(lows[key], highs[key], bins[key] + 1)[1:-1] for key in keys
-        ])
-
-    def step(self, action):
-        state, reward, done, info = self.env.step(action)
-
-        return np.asarray(utils.discretize(state, self._state_bins)), reward, done, info
-
-    def reset(self):
-        state = self.env.reset()
-
-        return np.asarray(utils.discretize(state, self._state_bins))
-
 if __name__ == "__main__":
     image = utils.read_image("/home/joel/Documents/leiden/introductory_research_project/data/trus/images/case10_11.png")
     label = utils.read_image("/home/joel/Documents/leiden/introductory_research_project/data/trus/labels/case10_11.png")
@@ -195,6 +179,6 @@ if __name__ == "__main__":
 
     # Check if we're using valid gym environments
     if check_envs:
-        env_checker.check_env(trus_env)
-        env_checker.check_env(paper_env)
+        env_checker.check_env(trus_env, skip_render_check=False)
+        env_checker.check_env(paper_env, skip_render_check=False)
         env_checker.check_env(discrete_env)

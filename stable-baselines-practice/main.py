@@ -1,5 +1,5 @@
-from wrapper import ExpandDimsWrapper
-from env import UltraSoundEnv, PaperUltraSoundEnv, Discretize
+from wrapper import ExpandDimsWrapper, Discretize
+from env import UltraSoundEnv, PaperUltraSoundEnv
 from gym.wrappers import TimeLimit
 from Q import Q
 from callback import CustomCallback
@@ -20,13 +20,9 @@ lows = {'area': 0., 'compactness': 0., 'objects': 0.}
 highs = {'area': 1., 'compactness': 1., 'objects': np.ceil(width / 2) * np.ceil(height / 2)}
 bins = (35, 35, 35)
 
-# env = PaperUltraSoundEnv(subimage, sublabel)
-# env = Discretize(env, lows, highs, bins)
-env = gym.make('FrozenLake-v1')
+env = PaperUltraSoundEnv(subimage, sublabel)
+env = Discretize(env, lows, highs, bins)
 env = TimeLimit(env, 150)
-env = ExpandDimsWrapper(env)
-
-print(env.reset())
 
 exploration_fraction = 0.1
 exploration_rate = 0.05
@@ -44,3 +40,14 @@ model = Q(
 )
 
 model.learn(100000, log_interval=1, tb_log_name=f"run-{exploration_fraction}-{exploration_fraction}", callback=callback)
+
+current_state = env.reset()
+env.render()
+
+for i in range(150):
+    action = model.predict(current_state, deterministic=True)
+
+    next_state, reward, done, info = env.step(action)
+    current_state = next_state
+
+    env.render()
