@@ -36,6 +36,7 @@ class Q(BaseAlgorithm):
         tensorboard_log: Optional[str] = None,
         verbose: int = 0, monitor_wrapper: bool = True, seed: Optional[int] = None,
         supported_action_spaces: Optional[Tuple[spaces.Space, ...]] = None,
+        use_sb3_env = False,
     ):
         super().__init__(
             policy='MlpPolicy', env=env, learning_rate=learning_rate, tensorboard_log=tensorboard_log,
@@ -50,6 +51,7 @@ class Q(BaseAlgorithm):
         self.exploration_initial_eps = exploration_initial_eps
         self.exploration_final_eps = exploration_final_eps
         self.exploration_fraction = exploration_fraction
+        self.use_sb3_env = use_sb3_env
         
         self._setup_model()
 

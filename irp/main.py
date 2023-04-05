@@ -1,4 +1,4 @@
-from irp.wrapper import ExpandDimsWrapper, Discretize
+from irp.wrapper import ExpandDims, Discretize
 from irp.env import UltraSoundEnv, PaperUltraSoundEnv
 from irp.q import Q
 from irp.callback import CustomCallback

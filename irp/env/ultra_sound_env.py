@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-import irp.utils
+from irp import utils
 
 class UltraSoundEnv(gym.Env):
     metadata = {
@@ -38,13 +38,13 @@ class UltraSoundEnv(gym.Env):
             return 0
 
     def step(self, action):
-        new_threshold_ids = irp.utils.process_thresholds(action, self.action_map, self.threshold_ids, self.num_thresholds)
+        new_threshold_ids = utils.process_thresholds(action, self.action_map, self.threshold_ids, self.num_thresholds)
         lt, rt = self.thresholds[new_threshold_ids]
 
         bit_mask = cv2.inRange(self.sample, int(lt), int(rt))
         next_state = cv2.bitwise_and(self.sample, self.sample, mask = bit_mask)
 
-        dissim = irp.utils.compute_dissimilarity(bit_mask, self.label)
+        dissim = utils.compute_dissimilarity(bit_mask, self.label)
         reward = self._get_reward(dissim)
         is_done = bool(dissim < 0.05)
 
@@ -58,7 +58,7 @@ class UltraSoundEnv(gym.Env):
         bit_mask = np.full(self.label.shape, 255)
         self.state = self.sample.reshape(*self.sample.shape, 1)
         self.threshold_ids = np.array([0, self.num_thresholds - 1])
-        self.old_dissim = irp.utils.compute_dissimilarity(bit_mask, self.label)
+        self.old_dissim = utils.compute_dissimilarity(bit_mask, self.label)
 
         return self.state
 

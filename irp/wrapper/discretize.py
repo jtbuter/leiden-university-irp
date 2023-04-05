@@ -1,21 +1,6 @@
 import gym
-from stable_baselines3.common.vec_env import util
 import numpy as np
 from irp import utils
-
-class ExpandDimsWrapper(gym.Wrapper):
-    def __init__(self, env):
-        super().__init__(env)
-
-        self.observation_space = gym.spaces.MultiDiscrete((env.observation_space.n,))
-
-    def step(self, action):
-        obs, reward, terminated, info = self.env.step(action)
-
-        return np.array([obs]), reward, terminated, info
-
-    def reset(self):
-        return np.array([self.env.reset()])
 
 class Discretize(gym.Wrapper):
     def __init__(self, env, lows, highs, bins):

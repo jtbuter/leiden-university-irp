@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 
 from stable_baselines3.common import env_checker
 
-import irp.utils
-from irp.wrapper import ExpandDimsWrapper, Discretize
+from irp import utils
 from irp.env.ultra_sound_env import UltraSoundEnv
 
 class PaperUltraSoundEnv(UltraSoundEnv):
@@ -17,7 +16,7 @@ class PaperUltraSoundEnv(UltraSoundEnv):
 
     def step(self, action):
         # Convert an action to new threshold indices
-        new_threshold_ids = irp.utils.process_thresholds(action, self.action_map, self.threshold_ids, self.num_thresholds)
+        new_threshold_ids = utils.process_thresholds(action, self.action_map, self.threshold_ids, self.num_thresholds)
 
         # Convert indices to gray-values for generalization
         lt, rt = self.thresholds[new_threshold_ids]
@@ -29,7 +28,7 @@ class PaperUltraSoundEnv(UltraSoundEnv):
         next_state = self.observation(bit_mask)
 
         # Compute dissimilarity and convert this to a reward
-        dissim = irp.utils.compute_dissimilarity(bit_mask, self.label)
+        dissim = utils.compute_dissimilarity(bit_mask, self.label)
         reward = self._get_reward(dissim)
         is_done = bool(dissim < 0.05)
 
@@ -53,7 +52,7 @@ class PaperUltraSoundEnv(UltraSoundEnv):
         next_state = self.observation(bit_mask)
 
         # Compute current dissimilarity
-        dissim = irp.utils.compute_dissimilarity(bit_mask, self.label)
+        dissim = utils.compute_dissimilarity(bit_mask, self.label)
 
         self.old_dissim = dissim
         self.threshold_ids = new_threshold_ids
@@ -62,7 +61,7 @@ class PaperUltraSoundEnv(UltraSoundEnv):
         return np.asarray(self.state, dtype=np.float32)
         
     def observation(self, bit_mask):
-        contours = irp.utils.get_contours(bit_mask)
+        contours = utils.get_contours(bit_mask)
         num_objects = len(contours)
 
         if num_objects == 0:
@@ -70,12 +69,12 @@ class PaperUltraSoundEnv(UltraSoundEnv):
 
         # Get the biggest object based on its area
         biggest_object = max(contours, key = cv2.contourArea)
-        object_area = irp.utils.get_area(biggest_object)
+        object_area = utils.get_area(biggest_object)
 
         if object_area == 0:
             return (0., 0., num_objects)
 
-        compactness = irp.utils.get_compactness(biggest_object, object_area)
-        normalized_area = irp.utils.normalize_area(bit_mask, object_area)
+        compactness = utils.get_compactness(biggest_object, object_area)
+        normalized_area = utils.normalize_area(bit_mask, object_area)
 
         return (normalized_area, compactness, num_objects)
