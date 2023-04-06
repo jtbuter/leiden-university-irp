@@ -10,7 +10,11 @@ class UltraSoundEnv(gym.Env):
     metadata = {
         "render.modes": ['human'], "render_fps": 1
     }
-    action_map = np.array([(-1, -1), (-1, 1), (1, -1), (1, 1)])
+    action_map = np.array([
+        (-1, -1), (-1, 0), (-1, 1),
+        (0, -1), (0, 0), (0, 1),
+        (1, -1), (1, 0), (1, 1)
+    ])
 
     def __init__(self, sample = None, label = None, num_thresholds = 10, render_mode=None):
         super(UltraSoundEnv, self).__init__()
@@ -19,7 +23,7 @@ class UltraSoundEnv(gym.Env):
         self.sample = sample.copy()
         self.state = None
 
-        self.action_space = gym.spaces.Discrete(n = 4)
+        self.action_space = gym.spaces.Discrete(n = len(self.action_map))
         self.observation_space = gym.spaces.Box(0, 255, self.sample.shape + (1,), np.uint8)
 
         self.num_thresholds = num_thresholds
@@ -36,6 +40,9 @@ class UltraSoundEnv(gym.Env):
             return 0
         elif dissim > self.old_dissim:
             return 0
+
+    def _is_valid_action(self, lt, rt):
+        return lt <= rt
 
     def step(self, action):
         new_threshold_ids = utils.process_thresholds(action, self.action_map, self.threshold_ids, self.num_thresholds)
