@@ -36,7 +36,7 @@ class Q(BaseAlgorithm):
         tensorboard_log: Optional[str] = None,
         verbose: int = 0, monitor_wrapper: bool = True, seed: Optional[int] = None,
         supported_action_spaces: Optional[Tuple[spaces.Space, ...]] = None,
-        use_sb3_env = False,
+        use_sb3_env = True,
     ):
         super().__init__(
             policy='MlpPolicy', env=env, learning_rate=learning_rate, tensorboard_log=tensorboard_log,
@@ -53,10 +53,6 @@ class Q(BaseAlgorithm):
         self.exploration_fraction = exploration_fraction
         self.use_sb3_env = use_sb3_env
         
-        if not use_sb3_env:
-            self.env = env
-            self.env.num_envs = 1
-
         self._setup_model()
 
     def _setup_model(self) -> None:
@@ -86,24 +82,16 @@ class Q(BaseAlgorithm):
         self.exploration_rate = self.exploration_schedule(self._current_progress_remaining)
         self.logger.record("rollout/exploration_rate", self.exploration_rate)
 
-    def _unwrap_sb3_env(self, *args):
-        return tuple(arg[0] for arg in args)        
-
     def collect_rollouts(self, callback: BaseCallback, log_interval: Optional[int] = None) -> RolloutReturn:
         callback.on_rollout_start()
         continue_training = True
 
         action = self.predict(self._last_obs)
-        
+
         if self.use_sb3_env:
             action = [action]
 
         next_state, reward, done, info = self.env.step(action)
-
-        if self.use_sb3_env:
-            next_state, reward, done, info = self._unwrap_sb3_env(
-                next_state, reward, done, info
-            )
 
         callback.update_locals(locals())
 
@@ -113,25 +101,21 @@ class Q(BaseAlgorithm):
 
         self.num_timesteps += 1
 
-        print(info)
-
         self._update_info_buffer(info, reward)
         self._update_current_progress_remaining(self.num_timesteps, self._total_timesteps)
 
         self._on_step()
 
+        # TODO: wrap deze code in een self-explanatory function?
         current_state = deepcopy(self._last_obs)
+        next_state, reward, done, info = self._unwrap_sb3_env(next_state, reward, done, info)
         new_state = next_state
 
         # VenEnv resets the environment when reaching a terminal state or truncating
         # episodes, and returns this as the next state instead of the terminal state.
         # However, the real terminal state is made accessible through info.
         if done:
-            if self.use_sb3_env:
-                new_state = info['terminal_observation']
-            else:
-                next_state = self.env.reset()
-
+            new_state = info['terminal_observation']
             self._episode_num += 1
 
             if log_interval is not None and self._episode_num % log_interval == 0:
@@ -144,6 +128,10 @@ class Q(BaseAlgorithm):
         self._last_obs = next_state
 
         return RolloutReturn(1, int(done), continue_training)
+
+
+    def _unwrap_sb3_env(self, *args):
+        return tuple(arg[0] for arg in args)
 
     def train(self):
         current_state, action, reward, next_state, done = self.rollout
@@ -198,8 +186,7 @@ class Q(BaseAlgorithm):
         )
 
         # Always work with one environment, so we can extract the first observation
-        if self.use_sb3_env:
-            self._last_obs = self._last_obs[0]
+        self._last_obs = self._last_obs[0]
 
         return total_timesteps, callback
 

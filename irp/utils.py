@@ -56,3 +56,25 @@ def get_dims(*args):
 
 def discretize(sample, grid):
     return tuple(int(np.digitize(s, g)) for s, g in zip(sample, grid))
+
+def make_simple_train_test(train_name, test_name):
+    base_url = "/home/joel/Documents/leiden/introductory_research_project/data/trus/"
+    image_url = base_url + "images/" 
+    label_url = base_url + "labels/"
+
+    train_test_images, train_test_labels = [], []
+    
+    for name in [train_name, test_name]:
+        image = read_image(image_url + name)
+        label = read_image(label_url + name)
+
+        subimages, coords = extract_subimages(image, 32, 16)
+        sublabels, coords = extract_subimages(label, 32, 16)
+
+        subimage = subimages[184]
+        sublabel = sublabels[184]
+
+        train_test_images.append(subimage)
+        train_test_labels.append(sublabel)
+    
+    return list(zip(train_test_images, train_test_labels))
