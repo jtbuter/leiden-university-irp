@@ -34,8 +34,8 @@ class Q(BaseAlgorithm):
         exploration_initial_eps: float = 1.0,
         exploration_final_eps: float = 0.05,
         tensorboard_log: Optional[str] = None,
-        verbose: int = 0, monitor_wrapper: bool = True, seed: Optional[int] = None,
-        supported_action_spaces: Optional[Tuple[spaces.Space, ...]] = None,
+        verbose: int = 0, monitor_wrapper: bool = True,
+        seed: Optional[int] = None,
         use_sb3_env = True,
     ):
         super().__init__(
@@ -52,10 +52,12 @@ class Q(BaseAlgorithm):
         self.exploration_final_eps = exploration_final_eps
         self.exploration_fraction = exploration_fraction
         self.use_sb3_env = use_sb3_env
-        
+
         self._setup_model()
 
     def _setup_model(self) -> None:
+        self.set_random_seed(self.seed)
+
         dims = utils.get_dims(self.observation_space, self.action_space)
 
         self.q_table = np.zeros(dims)
@@ -129,7 +131,6 @@ class Q(BaseAlgorithm):
 
         return RolloutReturn(1, int(done), continue_training)
 
-
     def _unwrap_sb3_env(self, *args):
         return tuple(arg[0] for arg in args)
 
@@ -185,7 +186,7 @@ class Q(BaseAlgorithm):
             total_timesteps, callback, reset_num_timesteps, tb_log_name, progress_bar
         )
 
-        # Always work with one environment, so we can extract the first observation
+        # We always work with one environment, so we can extract the first observation
         self._last_obs = self._last_obs[0]
 
         return total_timesteps, callback

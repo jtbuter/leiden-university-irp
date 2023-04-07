@@ -1,6 +1,5 @@
 from irp.wrappers import ExpandDims, Discretize
-from irp.envs import UltraSoundEnv, PaperUltraSoundEnv
-from irp.callback import CustomCallback
+from irp.envs import UltraSoundEnv, PaperUltraSoundEnv, Paper2008UltraSoundEnv
 from irp.q import Q
 from irp import utils
 
@@ -8,21 +7,7 @@ from gym.wrappers import TimeLimit
 import numpy as np
 import matplotlib.pyplot as plt
 
-import cli_args
-
-cli_args.from_schema({
-    "description": "Run RL experiments",
-    "arguments": [{
-        "short": "e",
-        "long": "experiment",
-        "help": "The name of the experiment",
-        "default": "run",
-        "var": "STRING",
-        "type": "str"
-    }]
-})
-
-data = utils.make_simple_train_test("case10_11.png", "case10_10.png")
+data = utils.make_sample_label("case10_11.png", "case10_10.png")
 train_image, train_label = data[0]
 test_image, test_label = data[1]
 
@@ -40,7 +25,6 @@ exploration_fraction = 0.2
 exploration_rate = 0.05
 learning_rate = 0.2
 gamma = 0.95
-callback = CustomCallback()
 
 model = Q(
     env,
@@ -51,7 +35,7 @@ model = Q(
     tensorboard_log="logs"
 )
 
-model.learn(200000, log_interval=1, tb_log_name=cli_args.argv['experiment'])
+model.learn(200000, log_interval=1, tb_log_name="run")
 
 env = PaperUltraSoundEnv(test_image, test_label, num_thresholds=15)
 env = Discretize(env, lows, highs, bins)

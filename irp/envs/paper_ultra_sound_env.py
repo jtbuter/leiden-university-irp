@@ -44,9 +44,9 @@ class PaperUltraSoundEnv(UltraSoundEnv):
 
     def _get_reward(self, dissim):
         if dissim < self.old_dissim:
-            return 2
+            return 10
         elif dissim == self.old_dissim:
-            return 1
+            return 0
         elif dissim > self.old_dissim:
             return 0
 
@@ -83,7 +83,7 @@ class PaperUltraSoundEnv(UltraSoundEnv):
             return (0., 0., 0.)
 
         # Get the biggest object based on its area
-        biggest_object = max(contours, key = cv2.contourArea)
+        biggest_object = max(contours, key=cv2.contourArea)
         object_area = utils.get_area(biggest_object)
 
         if object_area == 0:
