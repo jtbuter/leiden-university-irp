@@ -1,5 +1,6 @@
 import io
 import os
+import glob
 import pathlib
 import time
 import sys
@@ -216,6 +217,20 @@ class Q(BaseAlgorithm):
         ]
 
     def save(self: SelfQ, path: Union[str, pathlib.Path, io.BufferedIOBase], included: Optional[Iterable[str]] = []) -> None:
+        # Generate an initial unique model id
+        model_id = 1
+        
+        # Collect the number of previous times models with this configuration have been saved
+        model_paths = list(dir for dir in glob.glob(f'{path}_*') if os.path.isdir(dir))
+
+        # Check if there are actually any previous models
+        if len(model_paths) != 0:
+            # Extract the id of the last model we created to make a new unique id
+            model_id += sorted(map(lambda name: int(name.rsplit('_', 1)[1]), model_paths))[-1]
+
+        # Create a unique path name
+        path = f'{path}_{model_id}'
+
         # Prepare the locations to save the parameters and Q-table to
         q_table_path = os.path.join(path, 'q_table.npy')
         q_param_path = os.path.join(path, 'q_params.npy')
