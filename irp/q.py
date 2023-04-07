@@ -1,33 +1,33 @@
+import io
+import os
+import pathlib
 import time
 import sys
-from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
+from typing import Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union
 
 from copy import deepcopy
 
-import numpy as np
-import torch as th
 from gym import spaces
-from torch.nn import functional as F
-
+import numpy as np
 
 from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.buffers import ReplayBuffer
 from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.base_class import BaseAlgorithm
-from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, RolloutReturn, Schedule, TrainFreq, TrainFrequencyUnit
-from stable_baselines3.common.utils import get_linear_fn, get_parameters_by_name, polyak_update, safe_mean
-from stable_baselines3.common.vec_env import VecEnv
+from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, RolloutReturn, Schedule
+from stable_baselines3.common.utils import get_linear_fn, safe_mean
 
-from irp import utils
+from irp.policies import QPolicy
+
+SelfQ = TypeVar("SelfQ", bound="Q")
 
 class Q(BaseAlgorithm):
-
     policy_aliases: Dict[str, Type[BasePolicy]] = {
-        "MlpPolicy": BasePolicy
+        "MlpPolicy": QPolicy
     }
 
     def __init__(
-        self, env: Union[GymEnv, str],
+        self,
+        env: Union[GymEnv, str],
         learning_rate: Union[float, Schedule],
         gamma: float = 0.99,
         exploration_fraction: float = 0.1,
@@ -37,6 +37,7 @@ class Q(BaseAlgorithm):
         verbose: int = 0, monitor_wrapper: bool = True,
         seed: Optional[int] = None,
         use_sb3_env = True,
+        init_setup_model=True
     ):
         super().__init__(
             policy='MlpPolicy', env=env, learning_rate=learning_rate, tensorboard_log=tensorboard_log,
@@ -53,33 +54,31 @@ class Q(BaseAlgorithm):
         self.exploration_fraction = exploration_fraction
         self.use_sb3_env = use_sb3_env
 
-        self._setup_model()
+        self.rollout = None
 
-    def _setup_model(self) -> None:
+        if init_setup_model:
+            self._setup_model()
+
+    def _setup_model(self: SelfQ) -> None:
         self.set_random_seed(self.seed)
 
-        dims = utils.get_dims(self.observation_space, self.action_space)
-
-        self.q_table = np.zeros(dims)
-        self.rollout = None
+        self.policy = QPolicy(self.observation_space, self.action_space)
         self.exploration_schedule = get_linear_fn(
             self.exploration_initial_eps,
             self.exploration_final_eps,
             self.exploration_fraction,
         )
 
-    def predict(self, observation, deterministic: bool = False):
-        observation = tuple(observation)
-
+    def predict(self: SelfQ, observation, deterministic: bool = False):
         # Perform ε-greedy action selection
         if not deterministic and np.random.rand() < self.exploration_rate:
             action = self.action_space.sample()
         else:
-            action = np.argmax(self.q_table[observation])
+            action = self.policy.predict(observation=observation)
 
         return action
 
-    def _on_step(self):
+    def _on_step(self: SelfQ):
         # Get the exploration rate corresponding to the current timestep
         self.exploration_rate = self.exploration_schedule(self._current_progress_remaining)
         self.logger.record("rollout/exploration_rate", self.exploration_rate)
@@ -131,26 +130,25 @@ class Q(BaseAlgorithm):
 
         return RolloutReturn(1, int(done), continue_training)
 
-    def _unwrap_sb3_env(self, *args):
+    def _unwrap_sb3_env(self: SelfQ, *args):
         return tuple(arg[0] for arg in args)
 
-    def train(self):
+    def train(self: SelfQ):
         current_state, action, reward, next_state, done = self.rollout
 
         # Cast states to tuples so they can be used for array indexing
         current_state = tuple(current_state)
         next_state = tuple(next_state)
 
-        # Calculate the new q-values
-        q_old = self.q_table[current_state][action]
-        target = reward + self.gamma * max(self.q_table[next_state])
+        q_old = self.policy.q_table[current_state][action]
+        target = reward + self.gamma * max(self.policy.q_table[next_state])
         q_new = q_old + self.learning_rate * (target - q_old)
 
         # Update the Q-table
-        self.q_table[current_state][action] = q_new
+        self.policy.q_table[current_state][action] = q_new
 
     def learn(
-        self, total_timesteps: int, callback: MaybeCallback = None, log_interval: int = 1,
+        self: SelfQ, total_timesteps: int, callback: MaybeCallback = None, log_interval: int = 1,
         tb_log_name: str = "run", reset_num_timesteps: bool = True, progress_bar: bool = False,
     ):
         # Resets the environment, sets-up callbacks and prepares tensorboard logging
@@ -177,7 +175,7 @@ class Q(BaseAlgorithm):
         return self
 
     def _setup_learn(
-        self, total_timesteps: int, callback: MaybeCallback = None,
+        self: SelfQ, total_timesteps: int, callback: MaybeCallback = None,
         reset_num_timesteps: bool = True, tb_log_name: str = "run",
         progress_bar: bool = False
     ) -> Tuple[int, BaseCallback]:
@@ -191,7 +189,7 @@ class Q(BaseAlgorithm):
 
         return total_timesteps, callback
 
-    def _dump_logs(self) -> None:
+    def _dump_logs(self: SelfQ) -> None:
         time_elapsed = max((time.time_ns() - self.start_time) / 1e9, sys.float_info.epsilon)
         fps = int((self.num_timesteps - self._num_timesteps_at_start) / time_elapsed)
 
@@ -210,3 +208,57 @@ class Q(BaseAlgorithm):
 
         # Pass the number of timesteps for tensorboard
         self.logger.dump(step=self.num_timesteps)
+
+    def _included_save_params(self: SelfQ) -> List[str]:
+        return [
+            'learning_rate', 'gamma', 'seed', 'exploration_rate', 'exploration_initial_eps',
+            'exploration_final_eps', 'exploration_fraction', 'use_sb3_env'
+        ]
+
+    def save(self: SelfQ, path: Union[str, pathlib.Path, io.BufferedIOBase], included: Optional[Iterable[str]] = []) -> None:
+        # Prepare the locations to save the parameters and Q-table to
+        q_table_path = os.path.join(path, 'q_table.npy')
+        q_param_path = os.path.join(path, 'q_params.npy')
+
+        # Copy parameter list so we don't mutate the original dict
+        data = self.__dict__.copy()
+
+        # Exclude is union of specified parameters (if any) and standard exclusions
+        included = set(included).union(self._included_save_params())
+        keys = list(data.keys())
+
+        # Remove the parameters entries to be excluded
+        for param_name in keys:
+            if param_name not in included:
+                data.pop(param_name, None)
+
+        # Savely create the required directories for writing
+        pathlib.Path(path).mkdir(parents=True, exist_ok=True)
+
+        # Save the Q-table and model parameters
+        np.save(q_table_path, self.policy.q_table)
+        np.save(q_param_path, data)
+
+    @classmethod
+    def load(cls: Type[SelfQ], path: Union[str, pathlib.Path, io.BufferedIOBase], env: GymEnv) -> None:
+        # Prepare the locations to load the parameters and Q-table from
+        q_table_path = os.path.join(path, 'q_table.npy')
+        q_param_path = os.path.join(path, 'q_params.npy')
+
+        # Load the Q-table and model parameters
+        q_table = np.load(q_table_path, allow_pickle=True)
+        data = np.load(q_param_path, allow_pickle=True).item()
+
+        # Instantiate a new model
+        model = cls(env=env, learning_rate=None, init_setup_model=False)
+
+        # Update the model parameters
+        for key, value in data.items():
+            setattr(model, key, value)
+        
+        model._setup_model()
+
+        # Overwrite the initialized Q-table with the saved one.
+        model.policy.q_table = q_table
+
+        return model

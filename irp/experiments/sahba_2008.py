@@ -9,6 +9,8 @@ from irp.callbacks import StopOnDone
 from irp.q import Q
 from irp import utils
 
+from copy import deepcopy
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-el', '--episode-length', default=50, type=int)
@@ -62,7 +64,32 @@ model_name = f'g={gamma},el={episode_length},exr={exploration_rate},ts={num_time
 
 model.learn(num_timesteps, log_interval=1, tb_log_name=model_name, callback=callback)
 
-model.save('models')
+q_table_old = deepcopy(model.policy.q_table)
+
+model.save(f'experiments/sahba_2008/models/{model_name}')
+
+model = Q.load(path=f'experiments/sahba_2008/models/{model_name}', env=env)
+
+q_table_new = deepcopy(model.policy.q_table)
+
+print(q_table_old.shape, q_table_new.shape)
+
+assert np.all(q_table_new == q_table_old), "Not equal tables"
+
+# Copy parameter list so we don't mutate the original dict
+data = model.__dict__.copy()
+
+# Exclude is union of specified parameters (if any) and standard exclusions
+included = set([]).union(model._included_save_params())
+keys = list(data.keys())
+
+# Remove the parameters entries to be excluded
+for param_name in keys:
+    if param_name not in included:
+        data.pop(param_name, None)
+
+print(data)
+
 # env = Paper2008UltraSoundEnv(train_image, train_label, num_thresholds=num_thresholds, vjs=vjs)
 # env = Discretize(env, lows, highs, bins)
 # env = TimeLimit(env, episode_length)
