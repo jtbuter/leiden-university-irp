@@ -18,6 +18,10 @@ class PaperUltraSoundEnv(UltraSoundEnv):
         # Convert an action to new threshold indices
         new_threshold_ids = utils.process_thresholds(action, self.action_map, self.threshold_ids, self.num_thresholds)
 
+        # If the action we're trying to perform is not valid; do nothing
+        if not self._is_valid_action(*new_threshold_ids):
+            new_threshold_ids = self.threshold_ids
+
         # Convert indices to gray-values for generalization
         lt, rt = self.thresholds[new_threshold_ids]
 
@@ -38,9 +42,20 @@ class PaperUltraSoundEnv(UltraSoundEnv):
 
         return np.asarray(self.state, dtype=np.float32), reward, is_done, {}
 
+    def _get_reward(self, dissim):
+        if dissim < self.old_dissim:
+            return 10
+        elif dissim == self.old_dissim:
+            return 0
+        elif dissim > self.old_dissim:
+            return 0
+
     def reset(self):
         # Pick two random new threshold indices
         new_threshold_ids = np.random.choice(range(0, self.num_thresholds), 2)
+
+        # Ensuring the left threshold is always smaller than the right threshold
+        new_threshold_ids = np.sort(new_threshold_ids)
 
         # Convert indices to gray-values for generalization
         lt, rt = self.thresholds[new_threshold_ids]
@@ -68,7 +83,7 @@ class PaperUltraSoundEnv(UltraSoundEnv):
             return (0., 0., 0.)
 
         # Get the biggest object based on its area
-        biggest_object = max(contours, key = cv2.contourArea)
+        biggest_object = max(contours, key=cv2.contourArea)
         object_area = utils.get_area(biggest_object)
 
         if object_area == 0:
