@@ -242,7 +242,7 @@ class Q(BaseAlgorithm):
         included = set(included).union(self._included_save_params())
         keys = list(data.keys())
 
-        # Remove the parameters entries to be excluded
+        # Remove the parameters entries that are not to be included
         for param_name in keys:
             if param_name not in included:
                 data.pop(param_name, None)
