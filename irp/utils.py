@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+from pydoc import locate
 from gym import spaces
 from scipy.ndimage import median_filter
 
@@ -79,3 +80,7 @@ def make_sample_label(*args):
         train_test_labels.append(sublabel)
     
     return list(zip(train_test_images, train_test_labels))
+
+
+def str_to_builtin(value: str, builtin: str):
+    return locate(builtin)(value)
