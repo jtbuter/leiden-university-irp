@@ -3,3 +3,5 @@ pycache_
 myproject.egg-info
 */logs
 experiments
+./logger-test.py
+./us-mri-visualization.py
