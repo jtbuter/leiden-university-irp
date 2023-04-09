@@ -1,0 +1,9 @@
+experiment:
+  learning_rate: 0.8
+  gamma: 0.95
+  train_image: "case10_11.png"
+  test_image: "case10_10.png"
+  num_thresholds: 15
+  exploration_fraction: 0.0
+  vjs: !!python/tuple [0, 2, 5],
+  bins: !!python/tuple [35, 35, 35]
