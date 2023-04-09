@@ -6,6 +6,4 @@ def train(manager: ExperimentManager = None):
     manager.set_property('training_data', 'case10_11.png')
     manager.set_property('training_data', 'case10_11.png')
 
-# print(manager.)
-
 # manager.start(train)

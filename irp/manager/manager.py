@@ -58,10 +58,9 @@ class ExperimentManager:
         # Make sure the file calling the experiment has been committed
         uncommited_files = unstaged_files + staged_files + untracked_files
 
-        print(uncommited_files)
-
-        # If the experiment hasn't been committed, don't do anything
-        assert code_file not in uncommited_files, "The experiment hasn't been committed yet"
+        # If the experiment hasn't been committed, warn the user
+        if code_file in uncommited_files:
+            warnings.warn('Running an uncommitted experiment file')
 
         # Get the id of the current commit
         commit_id = repo.head.object.hexsha
@@ -75,7 +74,6 @@ class ExperimentManager:
                 'branch_name': branch_name
             }
         }
-
 
     def _get_experiment_name(self) -> str:
         self.parser.add_argument(
