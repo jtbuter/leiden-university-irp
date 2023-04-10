@@ -8,6 +8,7 @@ import warnings
 import numpy as np
 import inspect
 import git
+import pathlib
 
 import irp
 from irp import utils
@@ -24,7 +25,7 @@ class ExperimentManager:
             experiment_root = self._get_experiment_root()
 
         if experiment_name is None:
-            experiment_name = self._get_experiment_name()
+            experiment_name = self._get_experiment_name(code_file)
 
         self.experiment_root = experiment_root
         self.experiment_name = experiment_name
@@ -75,16 +76,24 @@ class ExperimentManager:
             }
         }
 
-    def _get_experiment_name(self) -> str:
+    def _get_experiment_name(self, code_file) -> str:
         self.parser.add_argument(
-            '--experiment-name', default="experiments", type=str,
+            '--experiment-name', default=None, type=str,
             help="Defines the basename of the experiment"
         )
 
         # Don't raise an error when unknown arguments are passed
         args, _ = self.parser.parse_known_args()
 
-        return args.experiment_name
+        experiment_name = args.experiment_name
+
+        if experiment_name is None or experiment_name == "":
+            code_file = pathlib.Path(os.path.abspath(code_file))
+            code_folder = os.path.basename(code_file.parent)
+
+            experiment_name = code_folder
+
+        return experiment_name
 
     def _get_experiment_root(self) -> str:
         self.parser.add_argument(

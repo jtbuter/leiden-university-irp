@@ -5,5 +5,5 @@ experiment:
   test_image: "case10_10.png"
   num_thresholds: 15
   exploration_fraction: 0.0
-  vjs: !!python/tuple [0, 2, 5],
-  bins: !!python/tuple [35, 35, 35]
+  vjs: [0, 2, 5]
+  bins: [35, 35, 35]
