@@ -7,10 +7,10 @@ import json
 from copy import deepcopy
 import warnings
 import numpy as np
-import inspect
 import git
 import pathlib
 from pygments import highlight, lexers, formatters
+import time
 
 import irp
 from irp import utils
@@ -78,6 +78,9 @@ class ExperimentManager:
         # If the experiment hasn't been committed, warn the user
         if code_file in uncommited_files and self.verbose > 0:
             warnings.warn('Running an uncommitted experiment file')
+
+            # Sleep a bit so the user has time to see the warning
+            time.sleep(1)
 
         # Get the id of the current commit
         commit_id = repo.head.object.hexsha
