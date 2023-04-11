@@ -27,7 +27,8 @@ def train(
     manager: ExperimentManager, train_image_path: str, test_image_path: str,
     learning_rate: float, gamma: float, exploration_fraction: float,
     exploration_rate: float, num_thresholds: int, vjs: tuple, bins: tuple,
-    episode_length: int, lows: dict, highs: dict, num_timesteps: int
+    episode_length: int, lows: dict, highs: dict, num_timesteps: int,
+    stop_on_done: bool
 ):
     data = utils.make_sample_label(train_image_path, test_image_path)
 
@@ -57,8 +58,11 @@ def train(
         ]}
     )
 
-    # Create callback for stopping when the experiment is done
-    callback = StopOnDone()
+    callback = None
+
+    if stop_on_done:
+        # Create callback for stopping when the experiment is done
+        callback = StopOnDone()
 
     # Initialize the environment
     env = Paper2008UltraSoundEnv(

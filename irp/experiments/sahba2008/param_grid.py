@@ -10,7 +10,7 @@ grid = ParameterGrid({
     'exploration_rate': [0.8, 0.9, 1.0]
 })
 
-# Get the name of this file
+# Get the name of the current file
 code_file = __file__
 
 # Explicitly use path to current file, instead of relative
