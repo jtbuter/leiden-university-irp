@@ -44,8 +44,18 @@ def train(
     experiments_folder = os.path.join(
         irp.ROOT_DIR, manager.experiment_root, manager.experiment_name
     )
-    tensorboard_log = os.path.join(experiments_folder, "tb-log")
     model_folder = os.path.join(experiments_folder, "model")
+
+    # Store the log-files for tensorboard directly in the experiments folder,
+    # instead of making a separate sub-directory
+    tensorboard_log = os.path.join(experiments_folder)
+
+    # Construct a tensorboard friendly experiment name
+    tb_log_name = utils.params_to_modelname(
+        **{key: manager.experiment[key] for key in [
+            'learning_rate', 'gamma', 'exploration_rate', 'episode_length'
+        ]}
+    )
 
     # Create callback for stopping when the experiment is done
     callback = StopOnDone()
@@ -66,7 +76,9 @@ def train(
         tensorboard_log=tensorboard_log
     )
 
-    model.learn(num_timesteps, log_interval=1, callback=callback)
+    model.learn(
+        num_timesteps, log_interval=1, callback=callback, tb_log_name=tb_log_name
+    )
     model.save(model_folder)
 
 # Get the name of this file
@@ -74,6 +86,14 @@ code_file = __file__
 
 # Explicitly use path to current file, instead of relative
 cfg_file = os.path.join(irp.ROOT_DIR, 'experiments/sahba2008/conf.yaml')
-manager = ExperimentManager(code_file=code_file, config_file=cfg_file)
+
+# Create multiple experiments
+manager = ExperimentManager(
+    experiment_root='results',
+    experiment_name='sahba2008',
+    code_file=code_file, config_file=cfg_file,
+    tb_friendly=True,
+    verbose=0
+)
 
 manager.start(train)

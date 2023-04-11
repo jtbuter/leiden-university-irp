@@ -87,3 +87,6 @@ def str_to_builtin(value: str, builtin: str = None):
     # return locate(builtin)(value)
 
     return eval(value)
+
+def params_to_modelname(**kwargs):
+    return ','.join(list(f'{key}={value}' for key, value in kwargs.items()))

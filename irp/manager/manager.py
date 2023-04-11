@@ -1,3 +1,4 @@
+import glob
 import os
 import argparse
 import yaml
@@ -21,7 +22,8 @@ class ExperimentManager:
     def __init__(
         self, code_file: str, experiment_name: str = None,
         experiment_root: str = None, experiment: dict = None,
-        config_file: str = None
+        config_file: str = None, tb_friendly: bool = False,
+        verbose: int = 0
     ) -> None:
         """
         code_file: Path of the file executing the code
@@ -29,6 +31,8 @@ class ExperimentManager:
         experiment_root: Location containing the `experiment_name` folder
         experiment: Dict containing user-defined experimental set-up
         config_file: Path to a configuration file
+        tb_friendly: Should we generate a unique name for the meta.npy file
+        verbose: Level of warnings we should display
         """
 
         if experiment_root is None:
@@ -40,6 +44,8 @@ class ExperimentManager:
         self.experiment_root = experiment_root
         self.experiment_name = experiment_name
         self.experiment = experiment
+        self.tb_friendly = tb_friendly
+        self.verbose = verbose
 
         # Ensures manager is being used properly, where code_file is the name
         # of the file executing the experiment
@@ -70,7 +76,7 @@ class ExperimentManager:
         uncommited_files = unstaged_files + staged_files + untracked_files
 
         # If the experiment hasn't been committed, warn the user
-        if code_file in uncommited_files:
+        if code_file in uncommited_files and self.verbose > 0:
             warnings.warn('Running an uncommitted experiment file')
 
         # Get the id of the current commit
@@ -193,14 +199,39 @@ class ExperimentManager:
         meta_folder = os.path.join(
             irp.ROOT_DIR, self.experiment_root, self.experiment_name
         )
+        meta_name = 'meta'
 
-        meta_path = os.path.join(meta_folder, 'meta.npy')
+        # We should create a unique filename for the meta-file; tensorboard style
+        if self.tb_friendly:
+            # Generate an initial unique model id
+            model_id = 1
 
-        if os.path.isfile(meta_path):
+            # Collect the number of previous times metas with this configuration have been saved
+            model_paths = glob.glob(os.path.join(meta_folder, 'meta_*.npy'))
+
+            # Check if there are actually any previous metas
+            if len(model_paths) != 0:
+                # Extract the id of the last model we created to make a new unique id.
+                model_id += sorted(map(
+                    lambda name: int(re.search('meta_(\d+)\.npy', name).group(1)), model_paths
+                ))[-1]
+
+            # Append the unique identifier to the meta_name
+            meta_name += f'_{model_id}'
+
+        # Add the extension to the meta_name
+        meta_name += '.npy'
+        meta_path = os.path.join(meta_folder, meta_name)
+
+        # Checking if meta-file in this location already exists (unnecessary
+        # when using tb_friendly mode)
+        if os.path.isfile(meta_path) and self.verbose > 0:
             warnings.warn('You\'re overwriting an existing meta-data file!')
 
+        # Make sure all the required directories exist/are created
         pathlib.Path(meta_folder).mkdir(parents=True, exist_ok=True)
 
+        # Save the data
         np.save(meta_path, _metadata, allow_pickle=True)
 
     def set_property(self, name, value):
