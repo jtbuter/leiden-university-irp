@@ -84,7 +84,10 @@ class Q(BaseAlgorithm):
         self.exploration_rate = self.exploration_schedule(self._current_progress_remaining)
         self.logger.record("rollout/exploration_rate", self.exploration_rate)
 
-    def collect_rollouts(self, callback: BaseCallback, log_interval: Optional[int] = None) -> RolloutReturn:
+    def collect_rollouts(
+        self, callback: BaseCallback, log_interval: Optional[int] = None,
+        log_every_timestep: Optional[bool] = False
+    ) -> RolloutReturn:
         callback.on_rollout_start()
         continue_training = True
 
@@ -120,7 +123,8 @@ class Q(BaseAlgorithm):
             new_state = info['terminal_observation']
             self._episode_num += 1
 
-            if log_interval is not None and self._episode_num % log_interval == 0:
+            # Logs every timestep or once every n episodes
+            if (log_interval is not None and self._episode_num % log_interval == 0) or log_every_timestep:
                 self._dump_logs()
 
         # Current state moet altijd de next state uit self.action() worden,
@@ -151,6 +155,7 @@ class Q(BaseAlgorithm):
     def learn(
         self: SelfQ, total_timesteps: int, callback: MaybeCallback = None, log_interval: int = 1,
         tb_log_name: str = "run", reset_num_timesteps: bool = True, progress_bar: bool = False,
+        log_every_timestep: Optional[bool] = False
     ):
         # Resets the environment, sets-up callbacks and prepares tensorboard logging
         total_timesteps, callback = self._setup_learn(
@@ -163,7 +168,7 @@ class Q(BaseAlgorithm):
 
         while self.num_timesteps < total_timesteps:
             # Perform a step in the environment and collect rewards
-            rollout = self.collect_rollouts(callback, log_interval)
+            rollout = self.collect_rollouts(callback, log_interval, log_every_timestep)
         
             if rollout.continue_training is False:
                 break
@@ -200,7 +205,7 @@ class Q(BaseAlgorithm):
             self.logger.record("rollout/ep_rew_mean", safe_mean([ep_info["r"] for ep_info in self.ep_info_buffer]))
             self.logger.record("rollout/ep_len_mean", safe_mean([ep_info["l"] for ep_info in self.ep_info_buffer]))
         
-        self.logger.record("time/fps", fps)
+        self.logger.record("time/fps", fps, exclude="tensorboard")
         self.logger.record("time/time_elapsed", int(time_elapsed), exclude="tensorboard")
         self.logger.record("time/total_timesteps", self.num_timesteps, exclude="tensorboard")
 

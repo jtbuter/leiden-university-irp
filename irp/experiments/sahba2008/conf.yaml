@@ -18,3 +18,4 @@ experiment:
     area: 1.0
     compactness: 1.0
     objects: "normalize"
+  stop_on_done: true

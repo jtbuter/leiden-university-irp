@@ -1,5 +1,6 @@
 from irp.wrappers import ExpandDims, Discretize
 from irp.envs import UltraSoundEnv, PaperUltraSoundEnv, Paper2008UltraSoundEnv
+from irp.callbacks import StopOnDone
 from irp.q import Q
 from irp import utils
 
@@ -35,25 +36,27 @@ model = Q(
     tensorboard_log="logs"
 )
 
-model.learn(200000, log_interval=1, tb_log_name="run")
+callback = StopOnDone()
 
-env = PaperUltraSoundEnv(test_image, test_label, num_thresholds=15)
-env = Discretize(env, lows, highs, bins)
-env = TimeLimit(env, 10)
+model.learn(200000, log_interval=1, tb_log_name="run", callback=callback, log_every_timestep=True)
 
-current_state = env.reset()
-env.render()
+# env = PaperUltraSoundEnv(test_image, test_label, num_thresholds=15)
+# env = Discretize(env, lows, highs, bins)
+# env = TimeLimit(env, 10)
 
-done = False
+# current_state = env.reset()
+# env.render()
 
-while not False:
-    action = model.predict(current_state, deterministic=True)
+# done = False
 
-    next_state, reward, done, info = env.step(action)
-    current_state = next_state
+# while not False:
+#     action = model.predict(current_state, deterministic=True)
 
-    plt.title((action, str(env.threshold_ids)))
-    env.render()
+#     next_state, reward, done, info = env.step(action)
+#     current_state = next_state
+
+#     plt.title((action, str(env.threshold_ids)))
+#     env.render()
 
 
 # for i in range(5):

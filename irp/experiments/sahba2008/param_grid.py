@@ -26,6 +26,7 @@ manager = ExperimentManager(
 
 # Iterate over all parameters
 for param in grid:
+    # Update the experiment to match the parameter grid
     for parameter, value in param.items():
         manager.set_value(parameter, value)
 
