@@ -23,7 +23,7 @@ class ExperimentManager:
         self, code_file: str, experiment_name: str = None,
         experiment_root: str = None, experiment: dict = None,
         config_file: str = None, tb_friendly: bool = False,
-        verbose: int = 0
+        verbose: int = 1
     ) -> None:
         """
         code_file: Path of the file executing the code
@@ -237,7 +237,10 @@ class ExperimentManager:
     def set_property(self, name, value):
         # Save a user-defined property to our metadata
         self.metadata['user_properties'][name] = value
-       
+
+    def set_value(self, name, value):
+        self.experiment[name] = value
+
     def __str__(self) -> str:
         definition = {
             'Root directory:': self.experiment_root,

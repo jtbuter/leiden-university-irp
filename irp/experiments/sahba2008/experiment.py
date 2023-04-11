@@ -38,7 +38,7 @@ def train(
     highs = parse_highs(**highs, label=train_label, bins=bins)
 
     # Update the experimental settings
-    manager.experiment['highs'] = highs
+    manager.set_value('highs', highs)
 
     # Construct the path where experiments are saved
     experiments_folder = os.path.join(
@@ -80,20 +80,3 @@ def train(
         num_timesteps, log_interval=1, callback=callback, tb_log_name=tb_log_name
     )
     model.save(model_folder)
-
-# Get the name of this file
-code_file = __file__
-
-# Explicitly use path to current file, instead of relative
-cfg_file = os.path.join(irp.ROOT_DIR, 'experiments/sahba2008/conf.yaml')
-
-# Create multiple experiments
-manager = ExperimentManager(
-    experiment_root='results',
-    experiment_name='sahba2008',
-    code_file=code_file, config_file=cfg_file,
-    tb_friendly=True,
-    verbose=0
-)
-
-manager.start(train)
