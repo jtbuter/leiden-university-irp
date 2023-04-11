@@ -35,8 +35,25 @@ vjs = (0, 2, 5)
 lows = {'area': 0., 'compactness': 0., 'objects': 0.}
 learning_rate = 0.8
 
+def parse_highs(area, compactness, objects, label, bins):
+    height, width = label.shape
+
+    if objects == "normalize":
+        objects = np.ceil(width / 2) * np.ceil(height / 2)
+    else:
+        objects = bins[-1] - 1
+
+    return {
+        'area': area,
+        'compactness': compactness,
+        'objects': objects
+    }
+
+
 # Unconfirmed parameters
-highs = {'area': 1., 'compactness': 1., 'objects': np.ceil(width / 2) * np.ceil(height / 2)}
+highs = {'area': 1., 'compactness': 1.,
+    'objects': np.ceil(width / 2) * np.ceil(height / 2)
+}
 bins = (35, 35, 35)
 
 episode_length = argv.episode_length

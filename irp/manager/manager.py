@@ -9,6 +9,7 @@ import numpy as np
 import inspect
 import git
 import pathlib
+from pygments import highlight, lexers, formatters
 
 import irp
 from irp import utils
@@ -19,8 +20,17 @@ class ExperimentManager:
 
     def __init__(
         self, code_file: str, experiment_name: str = None,
-        experiment_root: str = None, experiment = None
+        experiment_root: str = None, experiment: dict = None,
+        config_file: str = None
     ) -> None:
+        """
+        code_file: Path of the file executing the code
+        experiment_name: Name of the folder to save the results to
+        experiment_root: Location containing the `experiment_name` folder
+        experiment: Dict containing user-defined experimental set-up
+        config_file: Path to a configuration file
+        """
+
         if experiment_root is None:
             experiment_root = self._get_experiment_root()
 
@@ -36,7 +46,7 @@ class ExperimentManager:
         self._build(code_file)
 
         # Read config file and parse cli arguments
-        self._setup_experiment()
+        self._setup_experiment(config_file)
 
     def _build(self, code_file):
         # TODO: Use https://stackoverflow.com/a/52307120/10069642 solution for getting the executing file
@@ -87,6 +97,7 @@ class ExperimentManager:
 
         experiment_name = args.experiment_name
 
+        # Use parent directory of file using the manager to store experiments
         if experiment_name is None or experiment_name == "":
             code_file = pathlib.Path(os.path.abspath(code_file))
             code_folder = os.path.basename(code_file.parent)
@@ -97,7 +108,7 @@ class ExperimentManager:
 
     def _get_experiment_root(self) -> str:
         self.parser.add_argument(
-            '--experiment-root', default="experiments", type=str,
+            '--experiment-root', default="results", type=str,
             help="Defines the root all experiments"
         )
 
@@ -106,14 +117,16 @@ class ExperimentManager:
 
         return args.experiment_root
 
-    def _setup_experiment(self) -> None:
-        # Create the path to a possible .YAML configuration file
-        cfg_path = os.path.join(
-            irp.ROOT_DIR, self.experiment_root, self.experiment_name, 'conf.yaml'
-        )
-
+    def _setup_experiment(self, cfg_path) -> None:
+        # Test if during construction an experiment was passed by the user
         if self.experiment is None:
             self.experiment = {}
+
+        if cfg_path is None:
+            # Create the path to a possible .YAML configuration file
+            cfg_path = os.path.join(
+                irp.ROOT_DIR, self.experiment_root, self.experiment_name, 'conf.yaml'
+            )
 
         # See if a configuration file exists
         if os.path.isfile(cfg_path):
@@ -123,6 +136,7 @@ class ExperimentManager:
                 assert 'experiment' in config, "No experiment definition exists in conf.yaml"
 
                 self.experiment.update(config['experiment'])
+                self.metadata['details']['config_file'] = cfg_path
 
         _, unknown = self.parser.parse_known_args()
 
@@ -146,7 +160,8 @@ class ExperimentManager:
             self.experiment[name] = utils.str_to_builtin(value)
 
         # Initialize a dictionary for storing optional additional meta-data
-        self.metadata['properties'] = {}
+        # defined by the user
+        self.metadata['user_properties'] = {}
 
     def start(self, user_function):
         # Avoid modifying the original experiment parameters
@@ -175,24 +190,35 @@ class ExperimentManager:
             'metadata': self.metadata
         }
         
-        meta_path = os.path.join(
-            irp.ROOT_DIR, self.experiment_root, self.experiment_name, 'meta.npy'
+        meta_folder = os.path.join(
+            irp.ROOT_DIR, self.experiment_root, self.experiment_name
         )
+
+        meta_path = os.path.join(meta_folder, 'meta.npy')
 
         if os.path.isfile(meta_path):
             warnings.warn('You\'re overwriting an existing meta-data file!')
+
+        pathlib.Path(meta_folder).mkdir(parents=True, exist_ok=True)
 
         np.save(meta_path, _metadata, allow_pickle=True)
 
     def set_property(self, name, value):
         # Save a user-defined property to our metadata
-        self.metadata['properties'][name] = value
+        self.metadata['user_properties'][name] = value
        
     def __str__(self) -> str:
         definition = {
             'Root directory:': self.experiment_root,
             'Experiment name': self.experiment_name,
-            'Experimental tree': self.experiment
+            'Experimental tree': self.experiment,
+            'Meta-data': self.metadata
         }
 
-        return json.dumps(definition, indent = 4)
+        # Get a JSON representation of our manager
+        json_repr = json.dumps(definition, indent=4)
+
+        # Return a syntax-highlighted version
+        return highlight(
+            json_repr, lexers.JsonLexer(), formatters.TerminalFormatter()
+        )

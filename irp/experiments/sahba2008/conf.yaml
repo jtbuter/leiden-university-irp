@@ -1,9 +1,20 @@
 experiment:
+  train_image_path: "case10_10.png"
+  test_image_path: "case10_11.png"
   learning_rate: 0.8
   gamma: 0.95
-  train_image: "case10_11.png"
-  test_image: "case10_10.png"
-  num_thresholds: 15
   exploration_fraction: 0.0
+  exploration_rate: 0.05
+  num_thresholds: 15
   vjs: [0, 2, 5]
   bins: [35, 35, 35]
+  num_timesteps: 100000
+  episode_length: 10
+  lows:
+    area: 0.0
+    compactness: 0.0
+    objects: 0.0
+  highs:
+    area: 1.0
+    compactness: 1.0
+    objects: "normalize"
