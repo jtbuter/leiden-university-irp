@@ -5,6 +5,7 @@ from irp.manager.manager import ExperimentManager
 from irp.experiments.sahba2008.experiment import train
 import irp
 
+# Initialize the parameter grid
 grid = ParameterGrid({
     'gamma': [0.6],
     'exploration_rate': [0.8, 0.9, 1.0]
@@ -26,8 +27,11 @@ manager = ExperimentManager(
 
 # Iterate over all parameters
 for param in grid:
+    print('Started', list(param.items()))
+
     # Update the experiment to match the parameter grid
     for parameter, value in param.items():
         manager.set_value(parameter, value)
 
     manager.start(train)
+

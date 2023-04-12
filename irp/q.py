@@ -16,6 +16,7 @@ from stable_baselines3.common.policies import BasePolicy
 from stable_baselines3.common.base_class import BaseAlgorithm
 from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, RolloutReturn, Schedule
 from stable_baselines3.common.utils import get_linear_fn, safe_mean
+from stable_baselines3.common.logger import TensorBoardOutputFormat
 
 from irp.policies import QPolicy
 
@@ -193,6 +194,11 @@ class Q(BaseAlgorithm):
         # We always work with one environment, so we can extract the first observation
         self._last_obs = self._last_obs[0]
 
+        # Save reference to tensorboard formatter object
+        self._tb_formatter = next(
+            fmt for fmt in self.logger.output_formats if isinstance(fmt, TensorBoardOutputFormat)
+        )
+
         return total_timesteps, callback
 
     def _dump_logs(self: SelfQ) -> None:
@@ -282,3 +288,13 @@ class Q(BaseAlgorithm):
         model.policy.q_table = q_table
 
         return model
+
+    def _tb_write(self, tag: str, value: Union[str, float], timestep: int) -> None:
+        # Writing to formatter depends on `value` type
+        if isinstance(value, str):
+            self._tb_formatter.writer.add_text(tag, value, timestep)
+        else:
+            self._tb_formatter.writer.add_scalar(tag, value, timestep)
+
+        # Write the value to an output file
+        self._tb_formatter.writer.flush()

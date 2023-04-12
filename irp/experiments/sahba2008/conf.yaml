@@ -1,21 +1,25 @@
 experiment:
-  train_image_path: "case10_10.png"
-  test_image_path: "case10_11.png"
-  learning_rate: 0.8
-  gamma: 0.95
-  exploration_fraction: 0.0
-  exploration_rate: 0.05
-  num_thresholds: 15
-  vjs: [0, 2, 5]
-  bins: [35, 35, 35]
-  num_timesteps: 100000
-  episode_length: 10
-  lows:
-    area: 0.0
-    compactness: 0.0
-    objects: 0.0
+  train_image_path: "case10_10.png" # Confirmed
+  test_image_path: "case10_11.png" # Confirmed
+  learning_rate: 0.8 # Confirmed
+  exploration_fraction: 0.0 # Confirmed
+  num_thresholds: 15 # Confirmed
+  vjs: [0, 2, 5] # Confirmed
+  lows: # Confirmed
+    area: 0.0 # Confirmed
+    compactness: 0.0 # Confirmed
+    objects: 0.0 # Confirmed
   highs:
-    area: 1.0
-    compactness: 1.0
-    objects: "normalize"
-  stop_on_done: true
+    area: 1.0 # Confirmed
+    compactness: 1.0 # Confirmed
+    objects: "normalize" # Unconfirmed
+  # Unconfirmed (Reinforced Segmentation of Images Containing One Object
+  # of Interest, p. 83 does give γ = 0.6)
+  gamma: 0.6
+  exploration_rate: 0.05 # Unconfirmed waarde voor ε-greedy
+  bins: [35, 35, 35] # Unconfirmed
+  # Unconfirmed (A Reinforcement Learning Framework for Medical Image
+  # Segmentation, p. 6 gives max timesteps = 5.000)
+  num_timesteps: 5000
+  episode_length: 150 # Unconfirmed, was referenced somewhere
+  stop_on_done: false # Unconfirmed

@@ -58,9 +58,11 @@ def train(
         ]}
     )
 
+    # Initialize potential callback
     callback = None
 
-    if stop_on_done:
+    # Specifically evaluate for when `stop_on_done` is True
+    if stop_on_done is True:
         # Create callback for stopping when the experiment is done
         callback = StopOnDone()
 
@@ -80,7 +82,8 @@ def train(
         tensorboard_log=tensorboard_log
     )
 
-    model.learn(
-        num_timesteps, log_interval=1, callback=callback, tb_log_name=tb_log_name
-    )
+    # Start the learning process
+    model.learn(num_timesteps, callback=callback, tb_log_name=tb_log_name)
+
+    # Save the model
     model.save(model_folder)

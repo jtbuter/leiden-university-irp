@@ -1,93 +1,34 @@
-from irp.wrappers import ExpandDims, Discretize
-from irp.envs import UltraSoundEnv, PaperUltraSoundEnv, Paper2008UltraSoundEnv
-from irp.callbacks import StopOnDone
-from irp.q import Q
-from irp import utils
-
-from gym.wrappers import TimeLimit
+import cv2
 import numpy as np
 import matplotlib.pyplot as plt
+
+from irp import utils
 
 data = utils.make_sample_label("case10_11.png", "case10_10.png")
 train_image, train_label = data[0]
 test_image, test_label = data[1]
 
-height, width = train_label.shape
-lows = {'area': 0., 'compactness': 0., 'objects': 0.}
-# highs = {'area': 1., 'compactness': 1., 'objects': 34}
-highs = {'area': 1., 'compactness': 1., 'objects': np.ceil(width / 2) * np.ceil(height / 2)}
-bins = (35, 35, 35)
+def get_intensity_counts(image):   
+    intensities = np.zeros((256,), np.uint8)
+    ids, values = np.unique(image, return_counts=True)
+    intensities[ids] = values
 
-env = PaperUltraSoundEnv(train_image, train_label, num_thresholds=15)
-env = Discretize(env, lows, highs, bins)
-env = TimeLimit(env, 50)
+    return intensities
 
-exploration_fraction = 0.2
-exploration_rate = 0.05
-learning_rate = 0.2
-gamma = 0.95
+bit_mask = cv2.inRange(test_image, 0, 62)
 
-model = Q(
-    env,
-    learning_rate=learning_rate,
-    gamma=gamma,
-    exploration_fraction=exploration_fraction,
-    exploration_final_eps=exploration_rate,
-    tensorboard_log="logs"
-)
+f = plt.figure()
 
-callback = StopOnDone()
+f.add_subplot(121)
+plt.imshow(np.hstack([test_image, test_label, bit_mask]), cmap='gray')
 
-model.learn(200000, log_interval=1, tb_log_name="run", callback=callback, log_every_timestep=True)
+vals = test_image.flatten()
+counts, bins = np.histogram(vals, range(257))
 
-# env = PaperUltraSoundEnv(test_image, test_label, num_thresholds=15)
-# env = Discretize(env, lows, highs, bins)
-# env = TimeLimit(env, 10)
+f.add_subplot(122)
+plt.bar(bins[:-1] - 0.5, counts, width=1, edgecolor='none')
+plt.xlim([-0.5, 255.5])
 
-# current_state = env.reset()
-# env.render()
+plt.show()
 
-# done = False
-
-# while not False:
-#     action = model.predict(current_state, deterministic=True)
-
-#     next_state, reward, done, info = env.step(action)
-#     current_state = next_state
-
-#     plt.title((action, str(env.threshold_ids)))
-#     env.render()
-
-
-# for i in range(5):
-#     model = Q(
-#         env,
-#         learning_rate=learning_rate,
-#         gamma=gamma,
-#         exploration_fraction=exploration_fraction,
-#         exploration_final_eps=exploration_rate,
-#         tensorboard_log="logs"
-#     )
-
-#     model.learn(200000, log_interval=1, tb_log_name=f"run-200k-0.99-new_reward")
-
-#     # env = PaperUltraSoundEnv(test_image, test_label, num_thresholds=10)
-#     # env = Discretize(env, lows, highs, bins)
-#     # env = TimeLimit(env, 150)
-
-#     # current_state = env.reset()
-#     # env.render()
-
-#     for i in range(150):
-#         continue
-
-#         action = model.predict(current_state, deterministic=True)
-
-#         print(action)
-
-#         next_state, reward, done, info = env.step(action)
-#         current_state = next_state
-
-#         env.render()
-
-# print('Done')
+# get_intensity_counts(train_image)
