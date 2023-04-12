@@ -21,7 +21,7 @@ class Paper2008UltraSoundEnv(PaperUltraSoundEnv):
         action_map = []
 
         for vj in self.vjs:
-            action_map.extend(((-1, vj), (1, vj)))
+            action_map.extend([(-1, vj), (1, vj)])
 
         return action_map
 
@@ -52,6 +52,7 @@ class Paper2008UltraSoundEnv(PaperUltraSoundEnv):
         reward = self._get_reward(dissim)
         is_done = bool(dissim < 0.05)
 
+        # Safe values for the potential subsequent step
         self.old_dissim = dissim
         self.threshold_ids = new_threshold_id
         self.state = next_state
