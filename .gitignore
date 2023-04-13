@@ -1,7 +1,9 @@
 __pycache__
 pycache_
 myproject.egg-info
-*/logs
-irp/experiments
+logs
+irp/results
 logger-test.py
 us-mri-visualization.py
+old_sahba2008
+ipynb_checkpoints/

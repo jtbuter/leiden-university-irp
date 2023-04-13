@@ -81,6 +81,12 @@ def make_sample_label(*args):
     
     return list(zip(train_test_images, train_test_labels))
 
+def str_to_builtin(value: str, builtin: str = None):
+    # TODO: It's safer to use this way of casting variables, but for now use
+    # eval()
+    # return locate(builtin)(value)
 
-def str_to_builtin(value: str, builtin: str):
-    return locate(builtin)(value)
+    return eval(value)
+
+def params_to_modelname(**kwargs):
+    return ','.join(list(f'{key}={value}' for key, value in kwargs.items()))
