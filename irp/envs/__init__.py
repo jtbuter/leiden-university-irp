@@ -1,3 +1,4 @@
-from irp.envs.paper_ultra_sound_env import PaperUltraSoundEnv
+from irp.envs.custom_ultra_sound_env import CustomUltraSoundEnv
+from irp.envs.continuous_ultra_sound_env import ContinuousUltraSoundEnv
+from irp.envs.sahba_2008_env import Sahba2008UltraSoundEnv
 from irp.envs.ultra_sound_env import UltraSoundEnv
-from irp.envs.paper_2008_env import Paper2008UltraSoundEnv

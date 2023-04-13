@@ -1,5 +1,9 @@
+from irp.callbacks.max_n_eps import MaxNEpisodesCallback
 import gym
 import os
+
+from gym.wrappers import TimeLimit
+from stable_baselines3.common.callbacks import CallbackList
 
 from irp.callbacks import HParamCallback
 from irp.wrappers import ExpandDims
@@ -38,18 +42,20 @@ def main(manager: ExperimentManager):
     )
     env = gym.make('FrozenLake-v1')
     env = ExpandDims(env)
+    env = TimeLimit(env, 100)
 
-    for lr in [0.05, 0.1, 0.15, 0.2]:
-        for e in [0.1, 0.2, 0.3, 0.4, 0.5]:
-            for g in [0.90, 0.92, 0.94, 0.96, 0.98]:
-                model = Q(
-                    env, learning_rate=lr, gamma=g, exploration_fraction=e,
-                    tensorboard_log=experiments_folder
-                )
+    lr, g = 0.8, 0.95
+    episodes = 2000
 
-                model.learn(100000, tb_log_name=f'lr={lr},e={e},g={g}', callback=HParamCallback())
+    callback = CallbackList(callbacks=[HParamCallback(), MaxNEpisodesCallback(max_episodes=episodes)])
+    model = Q(
+        env, learning_rate=lr, gamma=g,
+        tensorboard_log=experiments_folder
+    )
 
-                evaluate_policy(model, env)
+    model.learn(1e9, tb_log_name=f'lr={lr},g={g}', callback=callback)
+
+    # evaluate_policy(model, env)
 
 # Get the name of the current file
 code_file = __file__

@@ -2,14 +2,15 @@ from gym.wrappers import TimeLimit
 import numpy as np
 import os
 
-import irp
+from stable_baselines3.common.callbacks import CallbackList
+
 from irp.manager.manager import ExperimentManager
-from irp import utils
 from irp.wrappers import Discretize
-from irp.envs import Paper2008UltraSoundEnv
-from irp.callbacks import StopOnDone
+from irp.envs import Sahba2008UltraSoundEnv
+from irp.callbacks import StopOnDoneCallback, LogNStepsCallback
 from irp.q import Q
 from irp import utils
+import irp
 
 def parse_highs(area, compactness, objects, label):
     height, width = label.shape
@@ -26,7 +27,7 @@ def parse_highs(area, compactness, objects, label):
 def train(
     manager: ExperimentManager, train_image_path: str, test_image_path: str,
     learning_rate: float, gamma: float, exploration_fraction: float,
-    exploration_rate: float, num_thresholds: int, vjs: tuple, bins: tuple,
+    exploration_final_eps: float, num_thresholds: int, vjs: tuple, bins: tuple,
     episode_length: int, lows: dict, highs: dict, num_timesteps: int,
     stop_on_done: bool
 ):
@@ -54,23 +55,26 @@ def train(
     # Construct a tensorboard friendly experiment name
     tb_log_name = utils.params_to_modelname(
         **{key: manager.experiment[key] for key in [
-            'learning_rate', 'gamma', 'exploration_rate', 'episode_length'
+            'learning_rate', 'gamma', 'exploration_final_eps', 'episode_length'
         ]}
     )
 
     # Initialize potential callback
-    callback = None
+    callback_list = []
 
     # Specifically evaluate for when `stop_on_done` is True
     if stop_on_done is True:
         # Create callback for stopping when the experiment is done
-        callback = StopOnDone()
+        callback_list.append(StopOnDoneCallback())
+
+    callback_list.append(LogNStepsCallback(freq=100))
+    callback = CallbackList(callbacks=callback_list)
 
     # Initialize the environment
-    env = Paper2008UltraSoundEnv(
-        train_image, train_label, num_thresholds=num_thresholds, vjs=vjs
-    )
+    env = Sahba2008UltraSoundEnv(train_image, train_label, num_thresholds, vjs)
+    # Cast continuous values to bins
     env = Discretize(env, lows, highs, bins)
+    # Set a maximum episode length
     env = TimeLimit(env, episode_length)
 
     model = Q(
@@ -78,7 +82,7 @@ def train(
         learning_rate=learning_rate,
         gamma=gamma,
         exploration_fraction=exploration_fraction,
-        exploration_final_eps=exploration_rate,
+        exploration_final_eps=exploration_final_eps, # Acts as an exploration rate
         tensorboard_log=tensorboard_log
     )
 
@@ -87,3 +91,18 @@ def train(
 
     # Save the model
     model.save(model_folder)
+
+if __name__ == "__main__":
+    # Initialize the manager
+    manager = ExperimentManager(
+        experiment_root='results',
+        experiment_name='sahba2008',
+        code_file=__file__,
+        config_file=os.path.join(irp.ROOT_DIR, 'experiments/sahba2008/conf.yaml'),
+        tb_friendly=True
+    )
+
+    manager.set_value('stop_on_done', False)
+    manager.set_value('episode_length', 150)
+
+    manager.start(train)

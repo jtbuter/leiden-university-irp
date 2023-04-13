@@ -4,26 +4,20 @@ import cv2
 import matplotlib.pyplot as plt
 
 from irp import utils
-from irp.envs.paper_ultra_sound_env import PaperUltraSoundEnv
+from irp.envs.ultra_sound_env import UltraSoundEnv
 
 from copy import deepcopy
 
-class Paper2008UltraSoundEnv(PaperUltraSoundEnv):
+class Sahba2008UltraSoundEnv(UltraSoundEnv):
     def __init__(self, sample = None, label = None, num_thresholds = 10, vjs = (0,)):
         super().__init__(sample, label, num_thresholds)
 
         self.vj = None
         self.vjs = np.array(vjs)
         self.action_map = self._vjs_step_map()
+
+        # Update the action-space based on the new action map
         self.action_space = gym.spaces.Discrete(n = len(self.action_map))
-
-    def _vjs_step_map(self):
-        action_map = []
-
-        for vj in self.vjs:
-            action_map.extend([(-1, vj), (1, vj)])
-
-        return action_map
 
     def step(self, action):
         delta, vj = self.action_map[action]
@@ -49,7 +43,7 @@ class Paper2008UltraSoundEnv(PaperUltraSoundEnv):
 
         # Compute dissimilarity and convert this to a reward
         dissim = utils.compute_dissimilarity(bit_mask, self.label)
-        reward = self._get_reward(dissim)
+        reward = self.reward(dissim)
         is_done = bool(dissim < 0.05)
 
         # Safe values for the potential subsequent step
@@ -93,7 +87,7 @@ class Paper2008UltraSoundEnv(PaperUltraSoundEnv):
 
         return np.asarray(self.state, dtype=np.float32)
 
-    def render(self, mode = None):
+    def _render(self):
         # Convert index to gray-values for generalization
         ti = self.thresholds[self.threshold_ids]
 
@@ -109,5 +103,14 @@ class Paper2008UltraSoundEnv(PaperUltraSoundEnv):
             state = cv2.morphologyEx(state, cv2.MORPH_OPEN, kernel)
 
         # Show the final result
+        plt.title('label - before morph - state')
         plt.imshow(np.hstack([self.label, before_morph, state]), cmap = 'gray', vmin = 0, vmax = 1)
         plt.show()
+
+    def _vjs_step_map(self):
+        action_map = []
+
+        for vj in self.vjs:
+            action_map.extend([(-1, vj), (1, vj)])
+
+        return action_map

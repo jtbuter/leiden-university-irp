@@ -1,4 +1,4 @@
-from stable_baselines3.common import env_checker
+from abc import abstractmethod
 import gym
 import numpy as np
 import cv2
@@ -7,9 +7,12 @@ import matplotlib.pyplot as plt
 from irp import utils
 
 class UltraSoundEnv(gym.Env):
+    # Has to be specified to pass the stable-baselines .render() check
     metadata = {
         "render.modes": ['human'], "render_fps": 1
     }
+
+    # Action map which allows for modifying the threshold index
     action_map = np.array([
         (-1, -1), (-1, 0), (-1, 1),
         (0, -1), (0, 0), (0, 1),
@@ -17,14 +20,12 @@ class UltraSoundEnv(gym.Env):
     ])
 
     def __init__(self, sample = None, label = None, num_thresholds = 10, render_mode=None):
-        super(UltraSoundEnv, self).__init__()
-
         self.label = label.copy()
         self.sample = sample.copy()
         self.state = None
 
+        self.observation_space = gym.spaces.Box(0, np.inf, (3,))
         self.action_space = gym.spaces.Discrete(n = len(self.action_map))
-        self.observation_space = gym.spaces.Box(0, 255, self.sample.shape + (1,), np.uint8)
 
         self.num_thresholds = num_thresholds
         self.threshold_ids = np.array([0, self.num_thresholds - 1])
@@ -33,7 +34,10 @@ class UltraSoundEnv(gym.Env):
         self.old_dissim = None
         self.render_mode = render_mode
 
-    def _get_reward(self, dissim):
+    def reward(self, *args):
+        return self._reward(*args)
+
+    def _reward(self, dissim):
         if dissim < self.old_dissim:
             return 10
         elif dissim == self.old_dissim:
@@ -44,41 +48,46 @@ class UltraSoundEnv(gym.Env):
     def _is_valid_action(self, lt, rt):
         return lt <= rt
 
+    @abstractmethod
     def step(self, action):
-        new_threshold_ids = utils.process_thresholds(action, self.action_map, self.threshold_ids, self.num_thresholds)
-        lt, rt = self.thresholds[new_threshold_ids]
+        pass
 
-        bit_mask = cv2.inRange(self.sample, int(lt), int(rt))
-        next_state = cv2.bitwise_and(self.sample, self.sample, mask = bit_mask)
-
-        dissim = utils.compute_dissimilarity(bit_mask, self.label)
-        reward = self._get_reward(dissim)
-        is_done = bool(dissim < 0.05)
-
-        self.old_dissim = dissim
-        self.threshold_ids = new_threshold_ids
-        self.state = next_state.reshape(*next_state.shape, 1)
-
-        return self.state, reward, is_done, {}
-
+    @abstractmethod
     def reset(self):
-        bit_mask = np.full(self.label.shape, 255)
-        self.state = self.sample.reshape(*self.sample.shape, 1)
-        self.threshold_ids = np.array([0, self.num_thresholds - 1])
-        self.old_dissim = utils.compute_dissimilarity(bit_mask, self.label)
+        pass
 
-        return self.state
+    def observation(self, bit_mask):
+        contours = utils.get_contours(bit_mask)
+        num_objects = len(contours)
+
+        if num_objects == 0:
+            return (0., 0., 0.)
+
+        # Get the biggest object based on its area
+        biggest_object = max(contours, key=cv2.contourArea)
+        object_area = utils.get_area(biggest_object)
+
+        if object_area == 0:
+            return (0., 0., num_objects)
+
+        compactness = utils.get_compactness(biggest_object, object_area)
+        normalized_area = utils.normalize_area(bit_mask, object_area)
+
+        return (normalized_area, compactness, num_objects)
 
     def render(self, mode = None):
+        self._render()
+
+    def _render(self):
         # Threshold ids obtained after resetting or performing a step
         lt, rt = self.thresholds[self.threshold_ids]
 
         # Apply the thresholds
         bit_mask = cv2.inRange(self.sample, int(lt), int(rt))
-        state = cv2.bitwise_and(self.sample, self.sample, mask = bit_mask)
+        state = cv2.bitwise_and(self.sample, self.sample, mask=bit_mask)
 
         # Show the final result
-        plt.imshow(np.hstack([self.label, state]), cmap = 'gray', vmin = 0, vmax = 1)
+        plt.imshow(np.hstack([self.label, state]), cmap='gray', vmin=0, vmax=1)
         plt.show()
 
     def close(self):
