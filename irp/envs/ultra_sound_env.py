@@ -25,11 +25,11 @@ class UltraSoundEnv(gym.Env):
         self.state = None
 
         self.observation_space = gym.spaces.Box(0, np.inf, (3,))
-        self.action_space = gym.spaces.Discrete(n = len(self.action_map))
+        self.action_space = gym.spaces.Discrete(n=len(self.action_map))
 
         self.num_thresholds = num_thresholds
         self.threshold_ids = np.array([0, self.num_thresholds - 1])
-        self.thresholds = np.linspace(np.min(sample), np.max(sample), num_thresholds, dtype = np.uint8)
+        self.thresholds = np.linspace(np.min(sample), np.max(sample), num_thresholds, dtype=np.uint8)
 
         self.old_dissim = None
         self.render_mode = render_mode

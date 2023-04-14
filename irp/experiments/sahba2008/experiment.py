@@ -1,6 +1,7 @@
 from gym.wrappers import TimeLimit
 import numpy as np
 import os
+import matplotlib.pyplot as plt
 
 from stable_baselines3.common.callbacks import CallbackList
 
@@ -72,8 +73,10 @@ def train(
 
     # Initialize the environment
     env = Sahba2008UltraSoundEnv(train_image, train_label, num_thresholds, vjs)
+
     # Cast continuous values to bins
     env = Discretize(env, lows, highs, bins)
+    
     # Set a maximum episode length
     env = TimeLimit(env, episode_length)
 
@@ -103,6 +106,7 @@ if __name__ == "__main__":
     )
 
     manager.set_value('stop_on_done', False)
-    manager.set_value('episode_length', 150)
+    manager.set_value('episode_length', 1)
+    manager.set_value('num_timesteps', 10000)
 
     manager.start(train)

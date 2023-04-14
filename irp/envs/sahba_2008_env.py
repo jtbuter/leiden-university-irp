@@ -17,7 +17,7 @@ class Sahba2008UltraSoundEnv(UltraSoundEnv):
         self.action_map = self._vjs_step_map()
 
         # Update the action-space based on the new action map
-        self.action_space = gym.spaces.Discrete(n = len(self.action_map))
+        self.action_space = gym.spaces.Discrete(n=len(self.action_map))
 
     def step(self, action):
         delta, vj = self.action_map[action]
