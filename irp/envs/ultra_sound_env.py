@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-from irp import utils
+import irp.utils
 
 class UltraSoundEnv(gym.Env):
     # Has to be specified to pass the stable-baselines .render() check
@@ -57,7 +57,7 @@ class UltraSoundEnv(gym.Env):
         pass
 
     def observation(self, bit_mask):
-        contours = utils.get_contours(bit_mask)
+        contours = irp.utils.get_contours(bit_mask)
         num_objects = len(contours)
 
         if num_objects == 0:
@@ -65,13 +65,13 @@ class UltraSoundEnv(gym.Env):
 
         # Get the biggest object based on its area
         biggest_object = max(contours, key=cv2.contourArea)
-        object_area = utils.get_area(biggest_object)
+        object_area = irp.utils.get_area(biggest_object)
 
         if object_area == 0:
             return (0., 0., num_objects)
 
-        compactness = utils.get_compactness(biggest_object, object_area)
-        normalized_area = utils.normalize_area(bit_mask, object_area)
+        compactness = irp.utils.get_compactness(biggest_object, object_area)
+        normalized_area = irp.utils.normalize_area(bit_mask, object_area)
 
         return (normalized_area, compactness, num_objects)
 

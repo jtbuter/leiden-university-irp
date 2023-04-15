@@ -18,6 +18,7 @@ from stable_baselines3.common.type_aliases import GymEnv, MaybeCallback, Rollout
 from stable_baselines3.common.utils import get_linear_fn, safe_mean
 from stable_baselines3.common.logger import TensorBoardOutputFormat
 
+import irp.utils
 from irp.policies import QPolicy
 
 SelfQ = TypeVar("SelfQ", bound="Q")
@@ -114,7 +115,7 @@ class Q(BaseAlgorithm):
 
         # TODO: wrap deze code in een self-explanatory function?
         current_state = deepcopy(self._last_obs)
-        next_state, reward, done, info = self._unwrap_sb3_env(next_state, reward, done, info)
+        next_state, reward, done, info = irp.utils.unwrap_sb3_env(next_state, reward, done, info)
         new_state = next_state
 
         # VenEnv resets the environment when reaching a terminal state or truncating
@@ -135,9 +136,6 @@ class Q(BaseAlgorithm):
         self._last_obs = next_state
 
         return RolloutReturn(1, int(done), continue_training)
-
-    def _unwrap_sb3_env(self: SelfQ, *args):
-        return tuple(arg[0] for arg in args)
 
     def train(self: SelfQ):
         current_state, action, reward, next_state, done = self.rollout

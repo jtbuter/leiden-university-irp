@@ -2,9 +2,9 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 
-from irp import utils
+import irp.utils
 
-data = utils.make_sample_label("case10_11.png", "case10_10.png")
+data = irp.utils.make_sample_label("case10_11.png", "case10_10.png")
 train_image, train_label = data[0]
 test_image, test_label = data[1]
 

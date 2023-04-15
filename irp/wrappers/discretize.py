@@ -1,6 +1,6 @@
 import gym
 import numpy as np
-from irp import utils
+import irp.utils
 
 class Discretize(gym.Wrapper):
     def __init__(self, env, lows, highs, bins):
@@ -15,7 +15,7 @@ class Discretize(gym.Wrapper):
 
     def _setup_env(self, lows, highs):
         keys = lows.keys()
-        bins = dict(zip(keys, utils.get_dims(self.observation_space)))
+        bins = dict(zip(keys, irp.utils.get_dims(self.observation_space)))
 
         self._state_bins = np.asarray([
             np.linspace(lows[key], highs[key], bins[key] + 1)[1:-1] for key in keys
@@ -24,9 +24,9 @@ class Discretize(gym.Wrapper):
     def step(self, action):
         state, reward, done, info = self.env.step(action)
 
-        return np.asarray(utils.discretize(state, self._state_bins)), reward, done, info
+        return np.asarray(irp.utils.discretize(state, self._state_bins)), reward, done, info
 
     def reset(self):
         state = self.env.reset()
 
-        return np.asarray(utils.discretize(state, self._state_bins))
+        return np.asarray(irp.utils.discretize(state, self._state_bins))

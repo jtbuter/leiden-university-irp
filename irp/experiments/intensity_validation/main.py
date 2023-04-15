@@ -5,13 +5,12 @@ import os
 from stable_baselines3.common.callbacks import CallbackList
 
 import irp
+import irp.utils
 from irp.manager.manager import ExperimentManager
-from irp import utils
 from irp.wrappers import Discretize
 from irp.envs import Paper2008UltraSoundEnv
 from irp.callbacks import StopOnDoneCallback
 from irp.q import Q
-from irp import utils
 
 def parse_highs(area, compactness, objects, label):
     height, width = label.shape
@@ -32,7 +31,7 @@ def train(
     episode_length: int, lows: dict, highs: dict, num_timesteps: int,
     stop_on_done: bool
 ):
-    data = utils.make_sample_label(train_image_path, test_image_path)
+    data = irp.utils.make_sample_label(train_image_path, test_image_path)
 
     train_image, train_label = data[0]
     test_image, test_label = data[1]
@@ -54,7 +53,7 @@ def train(
     tensorboard_log = os.path.join(experiments_folder)
 
     # Construct a tensorboard friendly experiment name
-    tb_log_name = utils.params_to_modelname(
+    tb_log_name = irp.utils.params_to_modelname(
         **{key: manager.experiment[key] for key in [
             'learning_rate', 'gamma', 'exploration_final_eps', 'episode_length', 'num_timesteps'
         ]}

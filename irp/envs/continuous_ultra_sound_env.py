@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 
 from irp.envs.ultra_sound_env import UltraSoundEnv
-from irp import utils
+import irp.utils
 
 class ContinuousUltraSoundEnv(UltraSoundEnv):
     metadata = {
@@ -25,13 +25,13 @@ class ContinuousUltraSoundEnv(UltraSoundEnv):
         super()._reward(dissim)
 
     def step(self, action):
-        new_threshold_ids = utils.process_thresholds(action, self.action_map, self.threshold_ids, self.num_thresholds)
+        new_threshold_ids = irp.utils.process_thresholds(action, self.action_map, self.threshold_ids, self.num_thresholds)
         lt, rt = self.thresholds[new_threshold_ids]
 
         bit_mask = cv2.inRange(self.sample, int(lt), int(rt))
         next_state = cv2.bitwise_and(self.sample, self.sample, mask = bit_mask)
 
-        dissim = utils.compute_dissimilarity(bit_mask, self.label)
+        dissim = irp.utils.compute_dissimilarity(bit_mask, self.label)
         reward = self.reward(dissim)
         is_done = bool(dissim < 0.05)
 
@@ -45,7 +45,7 @@ class ContinuousUltraSoundEnv(UltraSoundEnv):
         bit_mask = np.full(self.label.shape, 255)
         self.state = self.sample.reshape(*self.sample.shape, 1)
         self.threshold_ids = np.array([0, self.num_thresholds - 1])
-        self.old_dissim = utils.compute_dissimilarity(bit_mask, self.label)
+        self.old_dissim = irp.utils.compute_dissimilarity(bit_mask, self.label)
 
         return self.state
 

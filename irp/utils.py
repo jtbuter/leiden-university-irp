@@ -1,8 +1,23 @@
+import typing
+from typing import Union, Optional, Callable, Dict, Any, Tuple, List
+
+from stable_baselines3.common.vec_env import (VecEnv, DummyVecEnv)
+from stable_baselines3.common.monitor import Monitor
+
 import cv2
 import numpy as np
-from pydoc import locate
+
+import gym
 from gym import spaces
+from gym.wrappers import TimeLimit
+
 from scipy.ndimage import median_filter
+
+from irp.wrappers import Discretize
+from irp.envs import Sahba2008UltraSoundEnv
+
+if typing.TYPE_CHECKING:
+    from irp.q import Q  # pytype: disable=pyi-error
 
 def process_thresholds(action, action_map, tis, n_thresholds):
     return np.clip(tis + action_map[action], 0, n_thresholds - 1)
@@ -90,3 +105,57 @@ def str_to_builtin(value: str, builtin: str = None):
 
 def params_to_modelname(**kwargs):
     return ','.join(list(f'{key}={value}' for key, value in kwargs.items()))
+
+def unwrap_sb3_env(*args):
+    return tuple(arg[0] for arg in args)
+
+def evaluate_policy(
+    model: 'Q', env: gym.Env, n_eval_episodes: int = 10, n_eval_timesteps: float = np.inf
+) -> Union[Tuple[float, float], Tuple[List[float], List[int]]]:
+    env = Monitor(env)
+    env = DummyVecEnv([lambda: env])
+
+    episode_rewards = []
+
+    episode_count = 0
+    step_count = 0
+    current_reward = 0
+
+    observation = env.reset()[0]
+
+    while episode_count < n_eval_episodes:
+        action = model.predict(observation, deterministic=True)
+
+        next_state, reward, done, info = env.step([action])
+        next_state, reward, done, info = unwrap_sb3_env(next_state, reward, done, info)
+
+        current_reward += reward
+        step_count += 1
+
+        if done:
+            episode_rewards.append(current_reward)
+
+            episode_count += 1
+            current_reward = 0
+
+        observation = next_state
+
+    mean_reward = np.mean(episode_rewards)
+    std_reward = np.std(episode_rewards)
+
+    return mean_reward, std_reward
+
+def setup_environment(
+    image: np.ndarray, label: np.ndarray, num_thresholds: int,
+    vjs: tuple, lows: dict, highs: dict, bins: tuple, episode_length: int
+) -> gym.Env:
+    # Initialize the environment
+    env = Sahba2008UltraSoundEnv(image, label, num_thresholds, vjs)
+
+    # Cast continuous values to bins
+    env = Discretize(env, lows, highs, bins)
+    
+    # Set a maximum episode length
+    env = TimeLimit(env, episode_length)
+
+    return env

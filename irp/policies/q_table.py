@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 
 from stable_baselines3.common.policies import BasePolicy
 
-from irp import utils
+import irp.utils
 
 import numpy as np
 
@@ -14,7 +14,7 @@ class QPolicy(BasePolicy):
         self._build()
 
     def _build(self):
-        dims = utils.get_dims(self.observation_space, self.action_space)
+        dims = irp.utils.get_dims(self.observation_space, self.action_space)
 
         self.q_table = np.zeros(dims)
 

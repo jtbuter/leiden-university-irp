@@ -13,7 +13,7 @@ from pygments import highlight, lexers, formatters
 import time
 
 import irp
-from irp import utils
+import irp.utils
 
 class ExperimentManager:
     parser = argparse.ArgumentParser()
@@ -166,7 +166,7 @@ class ExperimentManager:
             # assert builtin in self.allowed_arg_types, f"Unrecognized argument type: {builtin}"
 
             # Save the value to experiments
-            self.experiment[name] = utils.str_to_builtin(value)
+            self.experiment[name] = irp.utils.str_to_builtin(value)
 
         # Initialize a dictionary for storing optional additional meta-data
         # defined by the user
@@ -183,13 +183,13 @@ class ExperimentManager:
 
         # Unpack the experiment dictionary into named function arguments, and
         # run the experiment
-        user_function(**_experiment)
+        result = user_function(**_experiment)
 
         # Store any meta-data a user has defined
         if self.metadata:
             self._dump()
 
-        return self
+        return result
 
     def _dump(self):
         # Initialize storage for the configuration used by the experiment

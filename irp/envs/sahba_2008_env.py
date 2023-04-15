@@ -3,7 +3,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
-from irp import utils
+import irp.utils
 from irp.envs.ultra_sound_env import UltraSoundEnv
 
 from copy import deepcopy
@@ -42,7 +42,7 @@ class Sahba2008UltraSoundEnv(UltraSoundEnv):
         next_state = self.observation(bit_mask)
 
         # Compute dissimilarity and convert this to a reward
-        dissim = utils.compute_dissimilarity(bit_mask, self.label)
+        dissim = irp.utils.compute_dissimilarity(bit_mask, self.label)
         reward = self.reward(dissim)
         is_done = bool(dissim < 0.05)
 
@@ -79,7 +79,7 @@ class Sahba2008UltraSoundEnv(UltraSoundEnv):
         next_state = self.observation(bit_mask)
 
         # Compute current dissimilarity
-        dissim = utils.compute_dissimilarity(bit_mask, self.label)
+        dissim = irp.utils.compute_dissimilarity(bit_mask, self.label)
 
         self.old_dissim = dissim
         self.threshold_ids = new_threshold_id
