@@ -1,3 +1,4 @@
+from __future__ import annotations
 import typing
 from typing import Union, Optional, Callable, Dict, Any, Tuple, List
 
@@ -17,7 +18,7 @@ from irp.wrappers import Discretize
 from irp.envs import Sahba2008UltraSoundEnv
 
 if typing.TYPE_CHECKING:
-    from irp.q import Q  # pytype: disable=pyi-error
+    from irp.q import Q
 
 def process_thresholds(action, action_map, tis, n_thresholds):
     return np.clip(tis + action_map[action], 0, n_thresholds - 1)
@@ -110,7 +111,7 @@ def unwrap_sb3_env(*args):
     return tuple(arg[0] for arg in args)
 
 def evaluate_policy(
-    model: 'Q', env: gym.Env, n_eval_episodes: int = 10, n_eval_timesteps: float = np.inf
+    model: Q, env: gym.Env, n_eval_episodes: int = 10, n_eval_timesteps: float = np.inf
 ) -> Union[Tuple[float, float], Tuple[List[float], List[int]]]:
     env = Monitor(env)
     env = DummyVecEnv([lambda: env])
