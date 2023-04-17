@@ -11,18 +11,6 @@ from irp.q import Q
 import irp.utils
 import irp
 
-def parse_highs(area, compactness, objects, label):
-    height, width = label.shape
-
-    if objects == "normalize":
-        objects = int(np.ceil(width / 2) * np.ceil(height / 2))
-
-    return {
-        'area': area,
-        'compactness': compactness,
-        'objects': objects
-    }
-
 def train(
     manager: ExperimentManager, train_image_path: str, test_image_path: str,
     learning_rate: float, gamma: float, exploration_fraction: float,
@@ -36,7 +24,7 @@ def train(
     test_image, test_label = data[1]
 
     # Parse the bin division descriptors
-    highs = parse_highs(**highs, label=train_label)
+    highs = irp.utils.parse_highs(**highs, label=train_label)
 
     # Update the experimental settings
     manager.set_value('highs', highs)

@@ -2,3 +2,4 @@ from irp.envs.custom_ultra_sound_env import CustomUltraSoundEnv
 from irp.envs.continuous_ultra_sound_env import ContinuousUltraSoundEnv
 from irp.envs.sahba_2008_env import Sahba2008UltraSoundEnv
 from irp.envs.ultra_sound_env import UltraSoundEnv
+from irp.envs.sahba_2008_range_threshold_env import Sahba2008RangedEnv

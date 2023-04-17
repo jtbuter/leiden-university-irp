@@ -15,7 +15,7 @@ from gym.wrappers import TimeLimit
 from scipy.ndimage import median_filter
 
 from irp.wrappers import Discretize
-from irp.envs import Sahba2008UltraSoundEnv
+from irp.envs.sahba_2008_env import Sahba2008UltraSoundEnv
 
 if typing.TYPE_CHECKING:
     from irp.q import Q
@@ -80,7 +80,7 @@ def make_sample_label(*args):
     image_url = base_url + "images/" 
     label_url = base_url + "labels/"
 
-    train_test_images, train_test_labels = [], []
+    images, labels = [], []
     
     for name in args:
         image = median_filter(read_image(image_url + name), 7)
@@ -92,10 +92,10 @@ def make_sample_label(*args):
         subimage = subimages[184]
         sublabel = sublabels[184]
 
-        train_test_images.append(subimage)
-        train_test_labels.append(sublabel)
+        images.append(subimage)
+        labels.append(sublabel)
     
-    return list(zip(train_test_images, train_test_labels))
+    return list(zip(images, labels))
 
 def str_to_builtin(value: str, builtin: str = None):
     # TODO: It's safer to use this way of casting variables, but for now use
@@ -160,3 +160,15 @@ def setup_environment(
     env = TimeLimit(env, episode_length)
 
     return env
+
+def parse_highs(area, compactness, objects, label):
+    height, width = label.shape
+
+    if objects == "normalize":
+        objects = int(np.ceil(width / 2) * np.ceil(height / 2))
+
+    return {
+        'area': area,
+        'compactness': compactness,
+        'objects': objects
+    }

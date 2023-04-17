@@ -90,5 +90,16 @@ class UltraSoundEnv(gym.Env):
         plt.imshow(np.hstack([self.label, state]), cmap='gray', vmin=0, vmax=1)
         plt.show()
 
+    def _apply_opening(self, bit_mask, size):
+        # Check that the structuring element has a size
+        if size == 0:
+            return bit_mask
+
+        # Apply an opening to the bit-mask
+        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size))
+        bit_mask = cv2.morphologyEx(bit_mask, cv2.MORPH_OPEN, kernel)
+
+        return bit_mask
+
     def close(self):
         pass
