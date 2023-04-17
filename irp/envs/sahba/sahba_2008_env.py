@@ -5,11 +5,11 @@ import cv2
 import matplotlib.pyplot as plt
 
 import irp.utils
-from irp.envs.sahba_2008_env import Sahba2008UltraSoundEnv
+from irp.envs import UltraSoundEnv
 
 from copy import deepcopy
 
-class Sahba2008RangedEnv(Sahba2008UltraSoundEnv):
+class Sahba2008UltraSoundEnv(UltraSoundEnv):
     def __init__(
         self,
         sample: np.ndarray = None,
@@ -17,26 +17,27 @@ class Sahba2008RangedEnv(Sahba2008UltraSoundEnv):
         num_thresholds: int = None,
         vjs: Tuple = None
     ):
-        super().__init__(sample, label, num_thresholds, vjs)
+        super().__init__(sample, label, num_thresholds)
 
-        # Store the used intensity threshold
-        self.ti = None
-
-        # Create the action map
-        self.action_map = self._ranged_step_map()
+        self.vj = None
+        self.vjs = np.array(vjs)
+        self.action_map = self._vjs_step_map()
 
         # Update the action-space based on the new action map
         self.action_space = gym.spaces.Discrete(n=len(self.action_map))
 
     def step(self, action):
-        ti, vj = self.action_map[action]
+        delta, vj = self.action_map[action]
+        new_threshold_id = np.clip(self.threshold_ids + delta, 0, self.num_thresholds - 1)
 
-        # Cast vj and ti to an integer for cv2
+        # Convert indices to gray-values for generalization
+        ti = self.thresholds[new_threshold_id]
+
+        # Extract a bit-mask using the gray-values
+        bit_mask = cv2.threshold(self.sample, int(ti), 255, cv2.THRESH_BINARY_INV)[1]
+
+        # Cast vj to an integer for cv2
         self.vj = int(vj)
-        self.ti = int(ti)
-
-        # Apply the threshold and obtain bit mask
-        bit_mask = cv2.threshold(self.sample, self.ti, 255, cv2.THRESH_BINARY_INV)[1]
 
         # Apply a morphological opening
         bit_mask = self._apply_opening(bit_mask, self.vj)
@@ -51,23 +52,26 @@ class Sahba2008RangedEnv(Sahba2008UltraSoundEnv):
 
         # Save values for the potential subsequent step
         self.old_dissim = dissim
+        self.threshold_ids = new_threshold_id
         self.state = next_state
 
         return np.asarray(self.state, dtype=np.float32), reward, is_done, {}
 
     def reset(self):
-        # Pick a random intensity
-        ti = np.random.choice(self.thresholds, 1)
+        # Pick a new random threshold index
+        new_threshold_id = np.random.choice(range(0, self.num_thresholds), 1)
+
+        # Convert indices to gray-values for generalization
+        ti = self.thresholds[new_threshold_id]
+
+        # Extract a bit-mask using the gray-values
+        bit_mask = cv2.threshold(self.sample, int(ti), 255, cv2.THRESH_BINARY_INV)[1]
 
         # Pick new morphing element size
         vj = np.random.choice(self.vjs, 1)
 
-        # Cast vj and ti to an integer for cv2
+        # Cast vj to an int for cv2
         self.vj = int(vj)
-        self.ti = int(ti)
-
-        # Extract a bit-mask using the gray-values
-        bit_mask = cv2.threshold(self.sample, self.ti, 255, cv2.THRESH_BINARY_INV)[1]
 
         # Apply a morphological opening
         bit_mask = self._apply_opening(bit_mask, self.vj)
@@ -79,24 +83,32 @@ class Sahba2008RangedEnv(Sahba2008UltraSoundEnv):
         dissim = irp.utils.compute_dissimilarity(bit_mask, self.label)
 
         self.old_dissim = dissim
+        self.threshold_ids = new_threshold_id
         self.state = next_state
 
         return np.asarray(self.state, dtype=np.float32)
 
     def _render(self):
+        # Convert index to gray-values for generalization
+        ti = self.thresholds[self.threshold_ids]
+
         # Extract a bit-mask using the gray-values
-        state = cv2.threshold(self.sample, self.ti, 255, cv2.THRESH_BINARY_INV)[1]
+        state = cv2.threshold(self.sample, int(ti), 255, cv2.THRESH_BINARY_INV)[1]
+
+        before_morph = deepcopy(state)
 
         # Apply a morphological opening
         state = self._apply_opening(state, self.vj)
 
         # Show the final result
-        plt.title('label- prediction')
-        plt.imshow(np.hstack([self.label, state]), cmap = 'gray', vmin = 0, vmax = 1)
+        plt.title('label - before morph - state')
+        plt.imshow(np.hstack([self.label, before_morph, state]), cmap = 'gray', vmin = 0, vmax = 1)
         plt.show()
 
-    def _ranged_step_map(self):
-        action_map = [(ti, vj) for vj in self.vjs for ti in self.thresholds]
+    def _vjs_step_map(self):
+        action_map = []
+
+        for vj in self.vjs:
+            action_map.extend([(-1, vj), (1, vj)])
 
         return action_map
-

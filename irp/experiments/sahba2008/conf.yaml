@@ -13,7 +13,7 @@ experiment:
   highs:
     area: 1.0 # Confirmed
     compactness: 1.0 # Confirmed
-    objects: "normalize" # Unconfirmed
+    objects: 'normalize' # Unconfirmed
   # Unconfirmed (Reinforced Segmentation of Images Containing One Object
   # of Interest, p. 83 does give γ = 0.6)
   gamma: 0.6

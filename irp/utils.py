@@ -1,6 +1,8 @@
 from __future__ import annotations
+import os
 import typing
 from typing import Union, Optional, Callable, Dict, Any, Tuple, List
+import irp
 
 from stable_baselines3.common.vec_env import (VecEnv, DummyVecEnv)
 from stable_baselines3.common.monitor import Monitor
@@ -15,7 +17,7 @@ from gym.wrappers import TimeLimit
 from scipy.ndimage import median_filter
 
 from irp.wrappers import Discretize
-from irp.envs.sahba_2008_env import Sahba2008UltraSoundEnv
+from irp.envs.sahba.sahba_2008_env import Sahba2008UltraSoundEnv
 
 if typing.TYPE_CHECKING:
     from irp.q import Q
@@ -75,16 +77,17 @@ def get_dims(*args):
 def discretize(sample, grid):
     return tuple(int(np.digitize(s, g)) for s, g in zip(sample, grid))
 
-def make_sample_label(*args):
-    base_url = "/home/joel/Documents/leiden/introductory_research_project/data/trus/"
-    image_url = base_url + "images/" 
-    label_url = base_url + "labels/"
+def make_sample_label(*file_names):
+    base_path = os.path.join(irp.ROOT_DIR, "../../data/trus/")
+    image_path = os.path.join(base_path, 'images')
+    label_path = os.path.join(base_path, 'labels')
 
     images, labels = [], []
     
-    for name in args:
-        image = median_filter(read_image(image_url + name), 7)
-        label = read_image(label_url + name)
+    for file_name in file_names:
+        image = read_image(os.path.join(image_path, file_name))
+        image = median_filter(image, 7)
+        label = read_image(os.path.join(label_path, file_name))
 
         subimages, coords = extract_subimages(image, 32, 16)
         sublabels, coords = extract_subimages(label, 32, 16)
@@ -124,6 +127,7 @@ def evaluate_policy(
 
     observation = env.reset()[0]
 
+    # Keep taking steps until an episode is finished
     while episode_count < n_eval_episodes:
         action = model.predict(observation, deterministic=True)
 
@@ -134,9 +138,10 @@ def evaluate_policy(
         step_count += 1
 
         if done:
-            episode_rewards.append(current_reward)
+            episode_rewards.append(current_reward / step_count)
 
             episode_count += 1
+            step_count = 0
             current_reward = 0
 
         observation = next_state
@@ -148,10 +153,14 @@ def evaluate_policy(
 
 def setup_environment(
     image: np.ndarray, label: np.ndarray, num_thresholds: int,
-    vjs: tuple, lows: dict, highs: dict, bins: tuple, episode_length: int
+    vjs: tuple, lows: dict, highs: dict, bins: tuple, episode_length: int,
+    env_cls = None
 ) -> gym.Env:
     # Initialize the environment
-    env = Sahba2008UltraSoundEnv(image, label, num_thresholds, vjs)
+    if env_cls is None:
+        env = Sahba2008UltraSoundEnv(image, label, num_thresholds, vjs)
+    else:
+        env = env_cls(image, label, num_thresholds, vjs)
 
     # Cast continuous values to bins
     env = Discretize(env, lows, highs, bins)

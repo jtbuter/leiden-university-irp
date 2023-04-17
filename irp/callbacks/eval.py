@@ -6,7 +6,7 @@ import numpy as np
 class EvalCallback(BaseCallback):
     model: Q
 
-    def __init__(self, eval_env, n_eval_episodes: int = 20, eval_freq: int = 10, verbose: int = 0):
+    def __init__(self, eval_env, n_eval_episodes: int = 20, eval_freq: int = 1000, verbose: int = 0):
         super().__init__(verbose=verbose)
 
         self._eval_env = eval_env
