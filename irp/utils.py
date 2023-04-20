@@ -16,11 +16,32 @@ from gym.wrappers import TimeLimit
 
 from scipy.ndimage import median_filter
 
-from irp.wrappers import Discretize
+from irp.wrappers.discretize import Discretize
 from irp.envs.sahba.sahba_2008_env import Sahba2008UltraSoundEnv
 
 if typing.TYPE_CHECKING:
     from irp.q import Q
+
+def apply_threshold(sample, *tis):
+    # print(tis)
+
+    if len(tis) == 1:
+        bit_mask = cv2.threshold(sample, int(tis[0]), 255, cv2.THRESH_BINARY_INV)[1]
+    else:
+        bit_mask = cv2.inRange(sample, int(tis[0]), int(tis[1]))
+
+    return bit_mask
+
+def apply_morphology(bit_mask, size):
+    # Check that the structuring element has a size
+    if size == 0:
+        return bit_mask
+
+    # Apply an opening to the bit-mask
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size))
+    bit_mask = cv2.morphologyEx(bit_mask, cv2.MORPH_OPEN, kernel)
+
+    return bit_mask
 
 def process_thresholds(action, action_map, tis, n_thresholds):
     return np.clip(tis + action_map[action], 0, n_thresholds - 1)
@@ -49,12 +70,32 @@ def extract_subimages(image, subimage_width, subimage_height):
 def get_contours(mask):
     return cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0]
 
+def get_largest_component(bit_mask):
+    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
+        bit_mask, 8, cv2.CV_32S
+    )
+
+    # We've only found background pixels
+    if num_labels == 1:
+        return num_labels, 0, bit_mask
+
+    # Get label of largest connected component
+    idx = np.argmax(stats[:,4])
+    # Retrieve the area of the largest component
+    area = stats[idx][4]
+    # Select the labels that correspond to the largest component label
+    largest_component = labels == idx
+
+    return num_labels, area, largest_component
+
+
 def get_compactness(contour, object_area):
     object_perimeter = cv2.arcLength(contour, True)
 
     return (4 * np.pi * object_area) / (object_perimeter ** 2)
 
 def get_area(contour):
+    # return cv2.countNonZero(contour)
     return cv2.contourArea(contour)
 
 def normalize_area(sub_image, object_area):
@@ -74,7 +115,7 @@ def get_dims(*args):
 
     return dims
 
-def discretize(sample, grid):
+def discrete(sample, grid):
     return tuple(int(np.digitize(s, g)) for s, g in zip(sample, grid))
 
 def make_sample_label(*file_names):
@@ -119,11 +160,9 @@ def evaluate_policy(
     env = Monitor(env)
     env = DummyVecEnv([lambda: env])
 
-    episode_rewards = []
+    episode_dissims = []
 
     episode_count = 0
-    step_count = 0
-    current_reward = 0
 
     observation = env.reset()[0]
 
@@ -134,20 +173,15 @@ def evaluate_policy(
         next_state, reward, done, info = env.step([action])
         next_state, reward, done, info = unwrap_sb3_env(next_state, reward, done, info)
 
-        current_reward += reward
-        step_count += 1
-
         if done:
-            episode_rewards.append(current_reward / step_count)
+            episode_dissims.append(info['dissimilarity'])
 
             episode_count += 1
-            step_count = 0
-            current_reward = 0
 
         observation = next_state
 
-    mean_reward = np.mean(episode_rewards)
-    std_reward = np.std(episode_rewards)
+    mean_reward = np.mean(episode_dissims)
+    std_reward = np.std(episode_dissims)
 
     return mean_reward, std_reward
 

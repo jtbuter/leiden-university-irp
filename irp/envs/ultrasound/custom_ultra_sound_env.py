@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 
 import irp.utils
-from irp.envs.ultra_sound_env import UltraSoundEnv
+from irp.envs.ultrasound.ultra_sound_env import UltraSoundEnv
 
 class CustomUltraSoundEnv(UltraSoundEnv):
     def step(self, action):

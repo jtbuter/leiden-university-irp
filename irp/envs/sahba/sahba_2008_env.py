@@ -5,7 +5,7 @@ import cv2
 import matplotlib.pyplot as plt
 
 import irp.utils
-from irp.envs import UltraSoundEnv
+from irp.envs.ultrasound.ultra_sound_env import UltraSoundEnv
 
 from copy import deepcopy
 

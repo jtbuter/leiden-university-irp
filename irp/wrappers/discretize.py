@@ -1,9 +1,10 @@
+from typing import Dict, Tuple
 import gym
 import numpy as np
 import irp.utils
 
 class Discretize(gym.Wrapper):
-    def __init__(self, env, lows, highs, bins):
+    def __init__(self, env: gym.Env, lows: Dict, highs: Dict, bins: Tuple):
         super().__init__(env)
 
         self._observation_space = gym.spaces.MultiDiscrete(bins)
@@ -24,9 +25,9 @@ class Discretize(gym.Wrapper):
     def step(self, action):
         state, reward, done, info = self.env.step(action)
 
-        return np.asarray(irp.utils.discretize(state, self._state_bins)), reward, done, info
+        return np.asarray(irp.utils.discrete(state, self._state_bins)), reward, done, info
 
     def reset(self):
         state = self.env.reset()
 
-        return np.asarray(irp.utils.discretize(state, self._state_bins))
+        return np.asarray(irp.utils.discrete(state, self._state_bins))

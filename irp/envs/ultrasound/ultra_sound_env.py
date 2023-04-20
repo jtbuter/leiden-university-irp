@@ -61,14 +61,14 @@ class UltraSoundEnv(gym.Env):
         num_objects = len(contours)
 
         if num_objects == 0:
-            return (0., 0., 0.)
+            return (1., 0., 0.)
 
         # Get the biggest object based on its area
         biggest_object = max(contours, key=cv2.contourArea)
         object_area = irp.utils.get_area(biggest_object)
 
         if object_area == 0:
-            return (0., 0., num_objects)
+            return (1., 0., num_objects)
 
         compactness = irp.utils.get_compactness(biggest_object, object_area)
         normalized_area = irp.utils.normalize_area(bit_mask, object_area)

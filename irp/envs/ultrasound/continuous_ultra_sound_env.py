@@ -2,7 +2,7 @@ import gym
 import numpy as np
 import cv2
 
-from irp.envs.ultra_sound_env import UltraSoundEnv
+from irp.envs.ultrasound.ultra_sound_env import UltraSoundEnv
 import irp.utils
 
 class ContinuousUltraSoundEnv(UltraSoundEnv):

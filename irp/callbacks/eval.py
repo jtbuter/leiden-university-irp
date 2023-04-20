@@ -19,5 +19,7 @@ class EvalCallback(BaseCallback):
                 self.model, self._eval_env, n_eval_episodes=self._n_eval_episodes
             )
 
-            self.model.logger.record("eval/mean_reward", float(mean_reward))
+            self.model.logger.record("eval//mean_dissimilarity", float(mean_reward))
             self.model.logger.dump(self.model.num_timesteps)
+
+        return True

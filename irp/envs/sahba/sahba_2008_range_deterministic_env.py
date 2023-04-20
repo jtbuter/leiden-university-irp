@@ -5,7 +5,7 @@ import cv2
 import matplotlib.pyplot as plt
 
 import irp.utils
-from irp.envs import Sahba2008RangedEnv
+from irp.envs.sahba.sahba_2008_range_threshold_env import Sahba2008RangedEnv
 
 class Sahba2008RangedDeterministicEnv(Sahba2008RangedEnv):
     def reset(self):

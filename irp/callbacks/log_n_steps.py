@@ -22,5 +22,5 @@ class LogNStepsCallback(BaseCallback):
 
             # Write to tensorboard
             self.model._tb_write(
-                "rollout/running_mean", safe_mean(recent_rewards), self.num_timesteps
+                "rollout//running_mean", safe_mean(recent_rewards), self.num_timesteps
             )

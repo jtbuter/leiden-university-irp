@@ -5,7 +5,7 @@ import cv2
 import matplotlib.pyplot as plt
 
 import irp.utils
-from irp.envs import Sahba2008UltraSoundEnv
+from irp.envs.sahba.sahba_2008_env import Sahba2008UltraSoundEnv
 
 class Sahba2008RangedEnv(Sahba2008UltraSoundEnv):
     def __init__(
