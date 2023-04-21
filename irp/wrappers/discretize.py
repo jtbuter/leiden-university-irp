@@ -1,10 +1,10 @@
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple, Union
 import gym
 import numpy as np
 import irp.utils
 
 class Discretize(gym.Wrapper):
-    def __init__(self, env: gym.Env, lows: Dict, highs: Dict, bins: Tuple):
+    def __init__(self, env: gym.Env, lows: Union[Dict, List], highs: Union[Dict, List], bins: Tuple):
         super().__init__(env)
 
         self._observation_space = gym.spaces.MultiDiscrete(bins)
@@ -14,8 +14,12 @@ class Discretize(gym.Wrapper):
 
         self._setup_env(lows, highs)
 
-    def _setup_env(self, lows, highs):
-        keys = lows.keys()
+    def _setup_env(self, lows: Union[Dict, List], highs: Union[Dict, List]):
+        if isinstance(lows, dict):
+            keys = lows.keys()
+        else:
+            keys = range(len(lows))
+
         bins = dict(zip(keys, irp.utils.get_dims(self.observation_space)))
 
         self._state_bins = np.asarray([

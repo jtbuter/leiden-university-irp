@@ -79,15 +79,14 @@ def get_largest_component(bit_mask):
     if num_labels == 1:
         return num_labels, 0, bit_mask
 
-    # Get label of largest connected component
-    idx = np.argmax(stats[:,4])
+    # Get label of largest connected component, skipping the background
+    idx = np.argmax(stats[1:,4]) + 1
     # Retrieve the area of the largest component
     area = stats[idx][4]
     # Select the labels that correspond to the largest component label
-    largest_component = labels == idx
+    largest_component = (labels == idx).astype(np.uint8) * 255
 
     return num_labels, area, largest_component
-
 
 def get_compactness(contour, object_area):
     object_perimeter = cv2.arcLength(contour, True)
@@ -102,7 +101,7 @@ def normalize_area(sub_image, object_area):
     height, width = sub_image.shape
     sub_image_area = height * width
 
-    return (sub_image_area - object_area) / sub_image_area
+    return object_area / sub_image_area
 
 def get_dims(*args):
     dims = tuple()

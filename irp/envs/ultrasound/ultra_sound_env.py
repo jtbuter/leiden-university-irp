@@ -1,4 +1,5 @@
 from abc import abstractmethod
+from typing import Tuple
 import gym
 import numpy as np
 import cv2
@@ -56,21 +57,23 @@ class UltraSoundEnv(gym.Env):
     def reset(self):
         pass
 
-    def observation(self, bit_mask):
+    def observation(self, bit_mask: np.ndarray) -> Tuple[float, float, int]:
         contours = irp.utils.get_contours(bit_mask)
         num_objects = len(contours)
 
         if num_objects == 0:
-            return (1., 0., 0.)
+            return (0., 0., 0)
 
         # Get the biggest object based on its area
         biggest_object = max(contours, key=cv2.contourArea)
         object_area = irp.utils.get_area(biggest_object)
 
         if object_area == 0:
-            return (1., 0., num_objects)
+            object_area = 1.
+            compactness = 0.
+        else:
+            compactness = irp.utils.get_compactness(biggest_object, object_area)
 
-        compactness = irp.utils.get_compactness(biggest_object, object_area)
         normalized_area = irp.utils.normalize_area(bit_mask, object_area)
 
         return (normalized_area, compactness, num_objects)
