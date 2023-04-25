@@ -20,8 +20,11 @@ class Sahba2008UltraSoundEnv(UltraSoundEnv):
         super().__init__(sample, label, num_thresholds)
 
         self.vj = None
-        self.vjs = np.array(vjs)
+        self.vjs = np.array(vjs).astype(np.uint8).tolist()
         self.action_map = self._vjs_step_map()
+
+        # Cast the floating point thresholds from the base-class to integers
+        self.thresholds = self.thresholds.astype(np.uint8).tolist()
 
         # Update the action-space based on the new action map
         self.action_space = gym.spaces.Discrete(n=len(self.action_map))
@@ -34,10 +37,10 @@ class Sahba2008UltraSoundEnv(UltraSoundEnv):
         ti = self.thresholds[new_threshold_id]
 
         # Extract a bit-mask using the gray-values
-        bit_mask = cv2.threshold(self.sample, int(ti), 255, cv2.THRESH_BINARY_INV)[1]
+        bit_mask = cv2.threshold(self.sample, ti, 255, cv2.THRESH_BINARY_INV)[1]
 
         # Cast vj to an integer for cv2
-        self.vj = int(vj)
+        self.vj = vj
 
         # Apply a morphological opening
         bit_mask = self._apply_opening(bit_mask, self.vj)
@@ -55,11 +58,13 @@ class Sahba2008UltraSoundEnv(UltraSoundEnv):
         self.threshold_ids = new_threshold_id
         self.state = next_state
 
-        return np.asarray(self.state, dtype=np.float32), reward, is_done, {}
+        info = {'dissimilarity': dissim}
+
+        return np.asarray(self.state, dtype=np.float32), reward, is_done, info
 
     def reset(self):
         # Pick a new random threshold index
-        new_threshold_id = np.random.choice(range(0, self.num_thresholds), 1)
+        new_threshold_id = np.random.choice(range(0, self.num_thresholds), 1).item()
 
         # Convert indices to gray-values for generalization
         ti = self.thresholds[new_threshold_id]

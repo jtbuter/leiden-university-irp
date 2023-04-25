@@ -22,9 +22,9 @@ class Discretize(gym.Wrapper):
 
         bins = dict(zip(keys, irp.utils.get_dims(self.observation_space)))
 
-        self._state_bins = np.asarray([
+        self._state_bins = [
             np.linspace(lows[key], highs[key], bins[key] + 1)[1:-1] for key in keys
-        ])
+        ]
 
     def step(self, action):
         state, reward, done, info = self.env.step(action)

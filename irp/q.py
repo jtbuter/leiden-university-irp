@@ -19,7 +19,7 @@ from stable_baselines3.common.utils import get_linear_fn, safe_mean
 from stable_baselines3.common.logger import TensorBoardOutputFormat
 
 import irp.utils
-from irp.policies import QPolicy
+from irp.policies.q_table import QPolicy
 
 SelfQ = TypeVar("SelfQ", bound="Q")
 
@@ -36,6 +36,7 @@ class Q(BaseAlgorithm):
         exploration_fraction: float = 0.1,
         exploration_initial_eps: float = 1.0,
         exploration_final_eps: float = 0.05,
+        exploration_delay: float = 0.0,
         tensorboard_log: Optional[str] = None,
         verbose: int = 0, monitor_wrapper: bool = True,
         seed: Optional[int] = None,
@@ -55,6 +56,7 @@ class Q(BaseAlgorithm):
         self.exploration_initial_eps = exploration_initial_eps
         self.exploration_final_eps = exploration_final_eps
         self.exploration_fraction = exploration_fraction
+        self.exploration_delay = exploration_delay
         self.use_sb3_env = use_sb3_env
 
         self.rollout = None
@@ -83,7 +85,13 @@ class Q(BaseAlgorithm):
 
     def _on_step(self: SelfQ):
         # Get the exploration rate corresponding to the current timestep
-        self.exploration_rate = self.exploration_schedule(self._current_progress_remaining)
+        if self._current_progress_remaining < 1 - self.exploration_delay:
+            self.exploration_rate = self.exploration_schedule(
+                self._current_progress_remaining + self.exploration_delay
+            )
+        else:
+            self.exploration_rate = self.exploration_initial_eps
+
         self.logger.record("rollout/exploration_rate", self.exploration_rate)
 
     def collect_rollouts(

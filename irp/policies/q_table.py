@@ -23,5 +23,9 @@ class QPolicy(BasePolicy):
 
     def _predict(self, observation: Union[np.ndarray, Dict[str, np.ndarray]]):
         observation = tuple(observation)
+        values = self.q_table[observation]
 
-        return np.argmax(self.q_table[observation])
+        if np.all(np.isclose(values, values[0])):
+            return self.action_space.sample()
+
+        return np.argmax(values)

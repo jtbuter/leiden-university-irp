@@ -30,6 +30,7 @@ class UltraSoundEnv(gym.Env):
 
         self.num_thresholds = num_thresholds
         self.threshold_ids = np.array([0, self.num_thresholds - 1])
+        # self.threshold_ids = None
         self.thresholds = np.linspace(np.min(sample), np.max(sample), num_thresholds, dtype=np.uint8)
 
         self.old_dissim = None
@@ -46,9 +47,6 @@ class UltraSoundEnv(gym.Env):
         elif dissim > self.old_dissim:
             return 0
 
-    def _is_valid_action(self, lt, rt):
-        return lt <= rt
-
     @abstractmethod
     def step(self, action):
         pass
@@ -57,6 +55,7 @@ class UltraSoundEnv(gym.Env):
     def reset(self):
         pass
 
+    @classmethod
     def observation(self, bit_mask: np.ndarray) -> Tuple[float, float, int]:
         contours = irp.utils.get_contours(bit_mask)
         num_objects = len(contours)

@@ -244,6 +244,21 @@ class ExperimentManager:
     def set_value(self, name, value):
         self.experiment[name] = value
 
+    @classmethod
+    def load(self, cfg_path):
+        experiment = {}
+
+        # See if a configuration file exists
+        if os.path.isfile(cfg_path):
+            with open(cfg_path, 'r') as cfg:
+                config = yaml.safe_load(cfg)
+
+                assert 'experiment' in config, "No experiment definition exists in conf.yaml"
+
+                experiment = config['experiment']
+
+        return experiment
+
     def __str__(self) -> str:
         definition = {
             'Root directory:': self.experiment_root,

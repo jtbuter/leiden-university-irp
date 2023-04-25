@@ -4,6 +4,7 @@ import cv2
 
 import gym
 import gym.wrappers
+import gym.spaces
 
 from irp.envs.ultrasound.ultra_sound_env import UltraSoundEnv
 from irp.wrappers import Discretize
@@ -31,16 +32,13 @@ class TrusEnv(UltraSoundEnv):
         # Counts number of times we didn't improve the accuracy
         self.num_unimproved_steps = 0
         self.max_unimproved_steps = max_unimproved_steps
+        self.delta = 0.05
 
     def step(self, action: int):
         # Convert an action to new threshold indices
         new_threshold_ids = utils.process_thresholds(
             action, self.action_map, self.threshold_ids, self.num_thresholds
         )
-
-        # # If the action we're trying to perform is not valid; do nothing
-        # if not self._is_valid_action(*new_threshold_ids):
-        #     new_threshold_ids = self.threshold_ids
 
         # Convert indices to gray-values
         lt, rt = self.thresholds[new_threshold_ids]
@@ -67,27 +65,22 @@ class TrusEnv(UltraSoundEnv):
         self.threshold_ids = new_threshold_ids
         self.state = next_state
 
+        # Expose dissimilarity
         info = {'dissimilarity': dissim}
 
         return np.asarray(next_state, dtype=np.float32), reward, done, info
 
-    # def observation(self, bit_mask):
-    #     return super().observation(bit_mask)[:2]
-
     def _is_done(self, dissim):
-        if self.num_unimproved_steps >= self.max_unimproved_steps:
-            return True
+        # if self.num_unimproved_steps >= self.max_unimproved_steps:
+        #     return True
 
-        return bool(dissim < 0.05)
+        return bool(dissim < self.delta)
 
     def _reward(self, dissim):
-        if self.num_unimproved_steps >= self.max_unimproved_steps:
-            return -1
-
-        if dissim <= self.old_dissim:
-            return 1
-        elif dissim > self.old_dissim:
-            return -1
+        if dissim < self.delta:
+            return 10
+        
+        return 0
 
     def reset(self):
         # Pick two random new threshold indices
@@ -113,7 +106,7 @@ class TrusEnv(UltraSoundEnv):
         self.threshold_ids = new_threshold_ids
         self.state = next_state
 
-        return np.asarray(self.state, dtype=np.float32)
+        return np.asarray(next_state, dtype=np.float32)
 
     def _render(self):
         lt, rt = self.thresholds[self.threshold_ids]
@@ -133,3 +126,22 @@ class TrusEnv(UltraSoundEnv):
         predict_axis.title.set_text('Prediction')
 
         plt.show()
+
+    def valid_action_mask(self):
+        lt_idx, rt_idx = self.threshold_ids
+        num_thresholds_m1 = self.num_thresholds - 1
+
+        # Mask actions that are not within bounds
+        action_0 = lt_idx > 0 and rt_idx < num_thresholds_m1
+        action_1 = lt_idx < num_thresholds_m1 and rt_idx > 0
+        action_2 = lt_idx > 0 and num_thresholds_m1 > 0
+        action_3 = lt_idx < num_thresholds_m1 and rt_idx < num_thresholds_m1
+        action_4 = True # Neutral action is always possible
+
+        # Mask action if it flips the order of the thresholds.
+        # `rt_idx`` has to be more than 2 higher than `lt_idx` to be valid
+        action_1 &= rt_idx - lt_idx > 1
+
+        return np.array(
+            [action_0, action_1, action_2, action_3, action_4], dtype=np.uint8
+        ) # Cast to np.uint8 to convert booleans to integer

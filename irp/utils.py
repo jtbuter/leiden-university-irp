@@ -4,9 +4,6 @@ import typing
 from typing import Union, Optional, Callable, Dict, Any, Tuple, List
 import irp
 
-from stable_baselines3.common.vec_env import (VecEnv, DummyVecEnv)
-from stable_baselines3.common.monitor import Monitor
-
 import cv2
 import numpy as np
 
@@ -16,15 +13,13 @@ from gym.wrappers import TimeLimit
 
 from scipy.ndimage import median_filter
 
-from irp.wrappers.discretize import Discretize
+import irp.wrappers.discretize
 from irp.envs.sahba.sahba_2008_env import Sahba2008UltraSoundEnv
 
 if typing.TYPE_CHECKING:
     from irp.q import Q
 
 def apply_threshold(sample, *tis):
-    # print(tis)
-
     if len(tis) == 1:
         bit_mask = cv2.threshold(sample, int(tis[0]), 255, cv2.THRESH_BINARY_INV)[1]
     else:
@@ -114,10 +109,10 @@ def get_dims(*args):
 
     return dims
 
-def discrete(sample, grid):
+def discrete(sample, grid) -> Tuple[int, ...]:
     return tuple(int(np.digitize(s, g)) for s, g in zip(sample, grid))
 
-def make_sample_label(*file_names):
+def make_sample_label(*file_names, idx=184):
     base_path = os.path.join(irp.ROOT_DIR, "../../data/trus/")
     image_path = os.path.join(base_path, 'images')
     label_path = os.path.join(base_path, 'labels')
@@ -132,8 +127,8 @@ def make_sample_label(*file_names):
         subimages, coords = extract_subimages(image, 32, 16)
         sublabels, coords = extract_subimages(label, 32, 16)
 
-        subimage = subimages[184]
-        sublabel = sublabels[184]
+        subimage = subimages[idx]
+        sublabel = sublabels[idx]
 
         images.append(subimage)
         labels.append(sublabel)
@@ -156,12 +151,17 @@ def unwrap_sb3_env(*args):
 def evaluate_policy(
     model: Q, env: gym.Env, n_eval_episodes: int = 10, n_eval_timesteps: float = np.inf
 ) -> Union[Tuple[float, float], Tuple[List[float], List[int]]]:
+    # These packages are extremely slow, so delay loading them
+    from stable_baselines3.common.vec_env import DummyVecEnv
+    from stable_baselines3.common.monitor import Monitor
+
     env = Monitor(env)
     env = DummyVecEnv([lambda: env])
 
     episode_dissims = []
 
     episode_count = 0
+    steps = 0
 
     observation = env.reset()[0]
 
@@ -171,11 +171,18 @@ def evaluate_policy(
 
         next_state, reward, done, info = env.step([action])
         next_state, reward, done, info = unwrap_sb3_env(next_state, reward, done, info)
+        
+        steps += 1
 
-        if done:
+        truncated = steps >= n_eval_timesteps
+
+        if done or truncated:
             episode_dissims.append(info['dissimilarity'])
-
+            steps = 0
             episode_count += 1
+
+            if truncated:
+                next_state = env.reset()[0]
 
         observation = next_state
 
@@ -196,7 +203,7 @@ def setup_environment(
         env = env_cls(image, label, num_thresholds, vjs)
 
     # Cast continuous values to bins
-    env = Discretize(env, lows, highs, bins)
+    env = irp.wrappers.discretize.Discretize(env, lows, highs, bins)
     
     # Set a maximum episode length
     env = TimeLimit(env, episode_length)
