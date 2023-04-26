@@ -25,7 +25,7 @@ class QPolicy(BasePolicy):
         observation = tuple(observation)
         values = self.q_table[observation]
 
-        if np.all(np.isclose(values, values[0])):
-            return self.action_space.sample()
+        # if np.all(np.isclose(values, values[0])):
+        #     return self.action_space.sample()
 
         return np.argmax(values)

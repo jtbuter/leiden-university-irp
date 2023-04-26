@@ -4,12 +4,12 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 
+import irp.envs.ultrasound.ultra_sound_env
 import irp.utils
-from irp.envs.ultrasound.ultra_sound_env import UltraSoundEnv
 
 from copy import deepcopy
 
-class Sahba2008UltraSoundEnv(UltraSoundEnv):
+class Sahba2008UltraSoundEnv(irp.envs.ultrasound.ultra_sound_env.UltraSoundEnv):
     def __init__(
         self,
         sample: np.ndarray = None,

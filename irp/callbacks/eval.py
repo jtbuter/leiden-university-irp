@@ -23,14 +23,14 @@ class EvalCallback(BaseCallback):
 
     def _on_step(self) -> bool:
         if self.n_calls % self._log_freq == 0 and self.n_calls > 0:
-            mean_reward, std_reward = irp.utils.evaluate_policy(
+            mean_dissimilarity, std_dissimilarity = irp.utils.evaluate_policy(
                 self.model,
                 self._eval_env,
                 n_eval_episodes=self._n_eval_episodes,
                 n_eval_timesteps=self._n_eval_timesteps
             )
 
-            self.model.logger.record("eval//mean_dissimilarity", float(mean_reward))
+            self.model.logger.record("eval//mean_dissimilarity", float(mean_dissimilarity))
             self.model.logger.dump(self.model.num_timesteps)
 
         return True

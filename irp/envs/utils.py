@@ -3,6 +3,14 @@ from typing import Optional, List
 import cv2
 import numpy as np
 
+def update_thresholds(
+    action: int,
+    action_map: np.ndarray,
+    old_tis: np.ndarray,
+    n_thresholds: int
+) -> np.ndarray:
+    return np.clip(old_tis + action_map[action], a_min=0, a_max=n_thresholds - 1)
+
 def apply_threshold(
     sample: np.ndarray,
     ti_left: int,
@@ -39,4 +47,13 @@ def get_intensity_spectrum(
 ) -> List[int]:
     minimum, maximum = np.min(sample), np.max(sample)
 
-    return np.linspace(minimum, maximum, n_thresholds, dtype=np.uint8).tolist()
+    return np.linspace(minimum, maximum, n_thresholds, dtype=np.uint8)
+
+def compute_dissimilarity(
+    bit_mask: np.ndarray,
+    label: np.ndarray
+) -> float:
+    # return np.sum(np.logical_xor(bit_mask, label)) / label.size
+
+    height, width = label.shape
+    return (np.sum(np.logical_xor(bit_mask, label)) / (height * width)).astype(float)

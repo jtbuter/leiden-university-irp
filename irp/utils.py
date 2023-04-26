@@ -14,7 +14,7 @@ from gym.wrappers import TimeLimit
 from scipy.ndimage import median_filter
 
 import irp.wrappers.discretize
-from irp.envs.sahba.sahba_2008_env import Sahba2008UltraSoundEnv
+# import irp.envs.sahba.sahba_2008_env
 
 if typing.TYPE_CHECKING:
     from irp.q import Q
@@ -151,6 +151,7 @@ def unwrap_sb3_env(*args):
 def evaluate_policy(
     model: Q, env: gym.Env, n_eval_episodes: int = 10, n_eval_timesteps: float = np.inf
 ) -> Union[Tuple[float, float], Tuple[List[float], List[int]]]:
+
     # These packages are extremely slow, so delay loading them
     from stable_baselines3.common.vec_env import DummyVecEnv
     from stable_baselines3.common.monitor import Monitor
@@ -174,9 +175,11 @@ def evaluate_policy(
         
         steps += 1
 
-        truncated = steps >= n_eval_timesteps
+        truncated = steps >= n_eval_timesteps or 'TimeLimit.truncated' in info
 
-        if done or truncated:
+        # TODO: Optionally use `done`, we don't use this right now, as the environment
+        # shouldn't have access to the ground-truth in evaluation mode.
+        if truncated:
             episode_dissims.append(info['dissimilarity'])
             steps = 0
             episode_count += 1
@@ -191,24 +194,24 @@ def evaluate_policy(
 
     return mean_reward, std_reward
 
-def setup_environment(
-    image: np.ndarray, label: np.ndarray, num_thresholds: int,
-    vjs: tuple, lows: dict, highs: dict, bins: tuple, episode_length: int,
-    env_cls = None
-) -> gym.Env:
-    # Initialize the environment
-    if env_cls is None:
-        env = Sahba2008UltraSoundEnv(image, label, num_thresholds, vjs)
-    else:
-        env = env_cls(image, label, num_thresholds, vjs)
+# def setup_environment(
+#     image: np.ndarray, label: np.ndarray, num_thresholds: int,
+#     vjs: tuple, lows: dict, highs: dict, bins: tuple, episode_length: int,
+#     env_cls = None
+# ) -> gym.Env:
+#     # Initialize the environment
+#     if env_cls is None:
+#         env = irp.envs.sahba.sahba_2008_env.Sahba2008UltraSoundEnv(image, label, num_thresholds, vjs)
+#     else:
+#         env = env_cls(image, label, num_thresholds, vjs)
 
-    # Cast continuous values to bins
-    env = irp.wrappers.discretize.Discretize(env, lows, highs, bins)
+#     # Cast continuous values to bins
+#     env = irp.wrappers.discretize.Discretize(env, lows, highs, bins)
     
-    # Set a maximum episode length
-    env = TimeLimit(env, episode_length)
+#     # Set a maximum episode length
+#     env = TimeLimit(env, episode_length)
 
-    return env
+#     return env
 
 def parse_highs(area, compactness, objects, label):
     height, width = label.shape
@@ -221,3 +224,18 @@ def parse_highs(area, compactness, objects, label):
         'compactness': compactness,
         'objects': objects
     }
+
+def get_subimages(filename):
+    # Define the paths to the related parent directories
+    base_path = os.path.join(irp.GIT_DIR, "../data/trus/")
+    image_path = os.path.join(base_path, 'images')
+    label_path = os.path.join(base_path, 'labels')
+    # Read the image and label
+    image = read_image(os.path.join(image_path, filename))
+    image = median_filter(image, 7)
+    label = read_image(os.path.join(label_path, filename))
+
+    subimages = extract_subimages(image, 32, 16)[0]
+    sublabels = extract_subimages(label, 32, 16)[0]
+
+    return subimages, sublabels
