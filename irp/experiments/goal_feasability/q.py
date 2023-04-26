@@ -3,7 +3,7 @@ import gym
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-from env import Env
+from irp.experiments.goal_feasability.env import Env
 from gym.wrappers import TimeLimit
 import irp.utils
 from irp import envs
@@ -12,11 +12,16 @@ import json
 subimages, sublabels = irp.utils.get_subimages('case10_11.png')
 subimage, sublabel = subimages[184], sublabels[184]
 
-env = Env(subimage, sublabel, 15)
+test_subimages, test_sublabels = irp.utils.get_subimages('case10_10.png')
+test_subimage, test_sublabel = test_subimages[184], test_sublabels[184]
+
+env = TimeLimit(Env(subimage, sublabel, 15), 15)
+test_env = TimeLimit(Env(test_subimage, test_sublabel, 15), 15)
+
 obs = set([
-        int(hashlib.sha256(
-            str(envs.utils.apply_threshold(subimage, ti).flatten().tolist()).encode('utf-8')
-        ).hexdigest(), 16) % 10**8 for ti in env.intensities
+    int(hashlib.sha256(
+        str(envs.utils.apply_threshold(subimage, ti).flatten().tolist()).encode('utf-8')
+    ).hexdigest(), 16) % 10**8 for ti in env.intensities
 ])
 qtable = {bit_mask: [0] * 3 for bit_mask in obs}
 

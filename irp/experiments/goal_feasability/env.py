@@ -8,6 +8,7 @@ import gym
 import gym.spaces
 import numpy as np
 import matplotlib.pyplot as plt
+from irp.envs.ultrasound.ultra_sound_env import UltraSoundEnv
 
 class Env(gym.Env):
     action_map = [-1, 0, 1]
@@ -49,17 +50,9 @@ class Env(gym.Env):
 
         return state
 
-    def render(self):
+    def render(self, mode):
         intensity = self.intensities[self.threshold_i]
         bit_mask = irp.envs.utils.apply_threshold(self.sample, intensity)
 
         plt.imshow(np.hstack([bit_mask, self.label]), cmap='gray', vmin=0, vmax=255)
         plt.show()
-
-subimages, sublabels = irp.utils.get_subimages('case10_10.png')
-subimage, sublabel = subimages[184], sublabels[184]
-
-env = Env(subimage, sublabel, 15)
-env.reset()
-env.step(0)
-env.step(2)
