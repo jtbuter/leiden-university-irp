@@ -4,6 +4,7 @@ import random
 import numpy as np
 import matplotlib.pyplot as plt
 from irp.experiments.goal_feasability.env import Env
+from irp.wrappers import Discretize
 from gym.wrappers import TimeLimit
 import irp.utils
 from irp import envs
@@ -15,15 +16,16 @@ subimage, sublabel = subimages[184], sublabels[184]
 test_subimages, test_sublabels = irp.utils.get_subimages('case10_10.png')
 test_subimage, test_sublabel = test_subimages[184], test_sublabels[184]
 
-env = TimeLimit(Env(subimage, sublabel, 15), 15)
-test_env = TimeLimit(Env(test_subimage, test_sublabel, 15), 15)
+env = Discretize(TimeLimit(Env(subimage, sublabel, 15), 15), lows=[0, 0, 0], highs=[1, 1, 1], bins=(35, 35, 35))
+# test_env = Discretize(TimeLimit(Env(test_subimage, test_sublabel, 15), 15), lows=[0, 0, 0], highs=[1, 1, 1], bins=(35, 35, 35))
 
 obs = set([
     int(hashlib.sha256(
         str(envs.utils.apply_threshold(subimage, ti).flatten().tolist()).encode('utf-8')
     ).hexdigest(), 16) % 10**8 for ti in env.intensities
 ])
-qtable = {bit_mask: [0] * 3 for bit_mask in obs}
+# qtable = {bit_mask: [0] * 3 for bit_mask in obs}
+qtable = np.zeros((35, 35, 35, 3))
 
 # Hyperparameters
 episodes = 1000        # Total number of episodes
@@ -66,12 +68,14 @@ for _ in range(2):
     done = False
 
     # Until the agent gets stuck in a hole or reaches the goal, keep training it
-    while not done:
+    while True:
         action = np.argmax(qtable[state])
              
         # Implement this action and move the agent in the desired direction
         new_state, reward, done, info = env.step(action)
         
+        print(info)
+
         # Update our current state
         state = new_state
 
@@ -80,5 +84,5 @@ for _ in range(2):
 
     print('done')
 
-print('Q-table after training:')
-print(json.dumps(qtable, indent=4))
+# print('Q-table after training:')
+# print(json.dumps(qtable, indent=4))

@@ -32,19 +32,23 @@ class Env(gym.Env):
         d_sim = irp.envs.utils.compute_dissimilarity(bit_mask, self.label)
         done = d_sim < 0.05
         reward = 1 if done else 0
-        state = str(bit_mask.flatten().tolist())
-        state = int(hashlib.sha256(state.encode('utf-8')).hexdigest(), 16) % 10**8
+        
+        state = UltraSoundEnv.observation(bit_mask)
         
         self.d_sim = d_sim
 
         return state, reward, done, {'dissim': d_sim}
 
     def reset(self):
-        self.threshold_i = self.n_thresholds - 1
+        if np.random.random() < 0.5:
+            self.threshold_i = self.n_thresholds - 1
+        else:
+            self.threshold_i = 0
+            
         intensity = self.intensities[self.threshold_i]
         bit_mask = irp.envs.utils.apply_threshold(self.sample, intensity)
-        state = str(bit_mask.flatten().tolist())
-        state = int(hashlib.sha256(state.encode('utf-8')).hexdigest(), 16) % 10**8
+        
+        state = UltraSoundEnv.observation(bit_mask)
 
         self.d_sim = irp.envs.utils.compute_dissimilarity(bit_mask, self.label)
 
