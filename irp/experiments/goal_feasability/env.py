@@ -22,6 +22,7 @@ class Env(gym.Env):
         self.threshold_i = None
         self.intensities = np.linspace(np.min(sample), np.max(sample), n_thresholds, dtype=np.uint8).tolist()
 
+        self.observation_space = gym.spaces.Discrete(n=15)
         self.action_space = gym.spaces.Discrete(n=3)
 
     def step(self, action) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:
@@ -32,29 +33,38 @@ class Env(gym.Env):
         d_sim = irp.envs.utils.compute_dissimilarity(bit_mask, self.label)
         done = d_sim < 0.05
         reward = 1 if done else 0
+        # state = str(bit_mask.flatten().tolist())
+        # state = int(hashlib.sha256(state.encode('utf-8')).hexdigest(), 16) % 10**8
         
         state = UltraSoundEnv.observation(bit_mask)
-        
+
         self.d_sim = d_sim
 
         return state, reward, done, {'dissim': d_sim}
 
-    def reset(self):
-        if np.random.random() < 0.5:
-            self.threshold_i = self.n_thresholds - 1
+    def reset(self, threshold_i: int = None):
+        # if threshold_i is None:
+        #     if np.random.random() < 0.5:
+        #         self.threshold_i = self.n_thresholds - 1
+        #     else:
+        #         self.threshold_i = 0
+        if threshold_i is None:
+            self.threshold_i = int(np.random.randint(0, self.n_thresholds))
         else:
-            self.threshold_i = 0
+            self.threshold_i = threshold_i
             
         intensity = self.intensities[self.threshold_i]
         bit_mask = irp.envs.utils.apply_threshold(self.sample, intensity)
-        
+        # state = str(bit_mask.flatten().tolist())
+        # state = int(hashlib.sha256(state.encode('utf-8')).hexdigest(), 16) % 10**8
+
         state = UltraSoundEnv.observation(bit_mask)
 
         self.d_sim = irp.envs.utils.compute_dissimilarity(bit_mask, self.label)
 
         return state
 
-    def render(self, mode):
+    def render(self, mode="human"):
         intensity = self.intensities[self.threshold_i]
         bit_mask = irp.envs.utils.apply_threshold(self.sample, intensity)
 

@@ -112,7 +112,7 @@ def get_dims(*args):
 def discrete(sample, grid) -> Tuple[int, ...]:
     return tuple(int(np.digitize(s, g)) for s, g in zip(sample, grid))
 
-def make_sample_label(*file_names, idx=184):
+def make_sample_label(*file_names, idx=184, width=32, height=16):
     base_path = os.path.join(irp.ROOT_DIR, "../../data/trus/")
     image_path = os.path.join(base_path, 'images')
     label_path = os.path.join(base_path, 'labels')
@@ -124,8 +124,8 @@ def make_sample_label(*file_names, idx=184):
         image = median_filter(image, 7)
         label = read_image(os.path.join(label_path, file_name))
 
-        subimages, coords = extract_subimages(image, 32, 16)
-        sublabels, coords = extract_subimages(label, 32, 16)
+        subimages, coords = extract_subimages(image, width, height)
+        sublabels, coords = extract_subimages(label, width, height)
 
         subimage = subimages[idx]
         sublabel = sublabels[idx]
@@ -225,7 +225,7 @@ def parse_highs(area, compactness, objects, label):
         'objects': objects
     }
 
-def get_subimages(filename):
+def get_subimages(filename, width=32, height=16):
     # Define the paths to the related parent directories
     base_path = os.path.join(irp.GIT_DIR, "../data/trus/")
     image_path = os.path.join(base_path, 'images')
@@ -235,7 +235,7 @@ def get_subimages(filename):
     image = median_filter(image, 7)
     label = read_image(os.path.join(label_path, filename))
 
-    subimages = extract_subimages(image, 32, 16)[0]
-    sublabels = extract_subimages(label, 32, 16)[0]
+    subimages = extract_subimages(image, width, height)[0]
+    sublabels = extract_subimages(label, width, height)[0]
 
     return subimages, sublabels

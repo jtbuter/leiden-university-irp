@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <style>
+            #gridder > div {
+                opacity: 0;
+                background-color: gray;
+            }
+
+
+            #gridder > div:hover {
+                opacity: 0.7
+            }
+        </style>
+    </head>
+    <body style="margin:0">
+        <div style="position:absolute; left:0; top:0;">
+            <div style="position:relative">
+                <img src="../data/trus/labels/case10_10.png" alt="" id="shower">
+                <div style="width: 512px; height: 512px; position:absolute; display: flex; flex-wrap: wrap; top:0; left:0;" id="gridder" width="512" height="512">
+                </div>
+            </div>
+            <div>
+                <input type="text" id="name" value="case10_10" tabindex="1">
+                <input type="text" id="dims" value="32 16" autofocus tabindex="2">
+            </div>
+            <span style="display: inline-block" id="idx"></span>
+        </div>
+        <script>
+            function sleep(ms) {
+                return new Promise(resolve => setTimeout(resolve, ms));
+            }
+
+            function imageExists(image_url){
+                var http = new XMLHttpRequest();
+                http.open('HEAD', image_url, false);
+                http.send();
+                return http.status != 404;
+            }
+
+            var width = 0;
+            var height = 0;
+
+            document.querySelector("#dims").addEventListener("input", (e) => {
+                var gridder = document.querySelector("#gridder");
+                gridder.innerHTML = "";
+
+                res = e.target.value.split(" ");
+
+                width = res[0]
+                height = res[1]
+
+                if (512 % height == 0 & 512 % width == 0 & width > 1 & height > 1) {
+                    document.querySelector('#idx').textContent = '';
+
+                    for (var i = 0; i < (512 / width) * (512 / height); i++) {
+                        var div = document.createElement('div');
+                        div.id = 'subimg' + i
+                        div.style.width = width + 'px'
+                        div.style.height = height + 'px'
+                        div.style.display = 'inline-block'
+                        div.style.flexShrink = '0'
+                        div.style.verticalAlign = 'top'
+                        // div.style.backgroundColor = 'blue';
+
+                        div.addEventListener('mouseover', (e) => {
+                            document.querySelector('#idx').textContent = e.target.id.replace('subimg', '');
+                        });
+
+                        gridder.appendChild(div)
+                    }
+                } else {
+                    document.querySelector('#idx').textContent = 'invalid dims'
+                }
+            });
+
+            document.querySelector("#dims").dispatchEvent(new Event('input', {bubbles:true}));
+
+            document.querySelector("#name").addEventListener("input", (e) => {
+                // document.querySelector('#idx').textContent = '';
+
+                img_name = "../data/trus/labels/" + e.target.value + '.png';
+
+                if (imageExists(img_name)) {
+                    document.querySelector("#shower").src = img_name
+                }
+            })
+        </script>
+    </body>
+</html>

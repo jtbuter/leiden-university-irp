@@ -1,88 +1,146 @@
 import hashlib
+import os
 import gym
 import random
 import numpy as np
 import matplotlib.pyplot as plt
 from irp.experiments.goal_feasability.env import Env
-from irp.wrappers import Discretize
 from gym.wrappers import TimeLimit
+from irp.wrappers import ExpandDims, Discretize
 import irp.utils
-from irp import envs
+from irp import envs, ROOT_DIR
 import json
+import irp.q
 
-subimages, sublabels = irp.utils.get_subimages('case10_11.png')
-subimage, sublabel = subimages[184], sublabels[184]
+def make_test_env(env):
+    test_subimages, test_sublabels = irp.utils.get_subimages('case10_10.png')
+    test_subimage, test_sublabel = test_subimages[184], test_sublabels[184]
 
-test_subimages, test_sublabels = irp.utils.get_subimages('case10_10.png')
-test_subimage, test_sublabel = test_subimages[184], test_sublabels[184]
+    test_env = Env(test_subimage, test_sublabel, 15)
+    test_env = TimeLimit(test_env, 15)
+    test_env = Discretize(test_env, [0, 0, 0], [1, 1, 1], env.observation_space.nvec)
+    test_env._state_bins = env._state_bins
 
-env = Discretize(TimeLimit(Env(subimage, sublabel, 15), 15), lows=[0, 0, 0], highs=[1, 1, 1], bins=(35, 35, 35))
-# test_env = Discretize(TimeLimit(Env(test_subimage, test_sublabel, 15), 15), lows=[0, 0, 0], highs=[1, 1, 1], bins=(35, 35, 35))
+    return test_env
 
-obs = set([
-    int(hashlib.sha256(
-        str(envs.utils.apply_threshold(subimage, ti).flatten().tolist()).encode('utf-8')
-    ).hexdigest(), 16) % 10**8 for ti in env.intensities
-])
-# qtable = {bit_mask: [0] * 3 for bit_mask in obs}
-qtable = np.zeros((35, 35, 35, 3))
+def evaluate(test_env: Env, qtable, render=False, eps=10):
+    dissims = []
 
-# Hyperparameters
-episodes = 1000        # Total number of episodes
-alpha = 0.5            # Learning rate
-gamma = 0.9            # Discount factor
-epsilon = 1.0          # Amount of randomness in the action selection
-epsilon_decay = 0.001  # Fixed amount to decrease
+    for _ in range(eps):
+        state = test_env.reset(threshold_i=14)
+        state = tuple(state)
+        done = False
 
-outcomes = []
-
-for _ in range(episodes):
-    state = env.reset()
-    done = False
-
-    # Until the agent gets stuck in a hole or reaches the goal, keep training it
-    while not done:
-        rnd = np.random.random()
-
-        if rnd < epsilon:
-            action = env.action_space.sample()
-        else:
+        # Until the agent gets stuck in a hole or reaches the goal, keep training it
+        while not done:
             action = np.argmax(qtable[state])
-             
-        # Implement this action and move the agent in the desired direction
-        new_state, reward, done, info = env.step(action)
+                
+            # Implement this action and move the agent in the desired direction
+            new_state, reward, _done, info = test_env.step(action)
+            new_state = tuple(new_state)
+            done = "TimeLimit.truncated" in info
 
-        print(reward, done, info, epsilon)
+            # Update our current state
+            state = new_state
 
-        # Update Q(s,a)
-        qtable[state][action] = qtable[state][action] + \
-                                alpha * (reward + gamma * np.max(qtable[new_state]) - qtable[state][action])
-        
-        # Update our current state
-        state = new_state
+            if render:
+                test_env.render()
 
-    epsilon = max(epsilon - epsilon_decay, 0.05)
+        dissims.append(info['dissim'])
 
-for _ in range(2):
-    state = env.reset()
-    done = False
+    return sum(dissims) / eps
 
-    # Until the agent gets stuck in a hole or reaches the goal, keep training it
-    while True:
-        action = np.argmax(qtable[state])
-             
-        # Implement this action and move the agent in the desired direction
-        new_state, reward, done, info = env.step(action)
-        
-        print(info)
+if __name__ == "__main__":
+    subimages, sublabels = irp.utils.get_subimages('case10_11.png')
+    subimage, sublabel = subimages[184], sublabels[184]
 
-        # Update our current state
-        state = new_state
+    env = Env(subimage, sublabel, 15)
+    env = TimeLimit(env, 15)
+    bins = (140, 140, 140)
+    env = Discretize(env, [0, 0, 0], [1, 1, 139], bins)
+    test_env = make_test_env(env)
 
-        print(reward, done, info)
-        env.render()
+    qtable = np.zeros(bins + (3,))
 
-    print('done')
+    # Hyperparameters
+    episodes = 5000        # Total number of episodes
+    alpha = 0.5            # Learning rate
+    gamma = 0.9            # Discount factor
+    epsilon = 1.0          # Amount of randomness in the action selection
+    epsilon_decay = 0.01  # Fixed amount to decrease
 
-# print('Q-table after training:')
-# print(json.dumps(qtable, indent=4))
+    model = irp.q.Q(env, 0.0, tensorboard_log=os.path.join(ROOT_DIR, 'results/goal_feasability'))
+    model.learn(0)
+
+    t = 0
+    rewards = []
+    ep_len = []
+    dissims = []
+
+    for e in range(episodes):
+        state = tuple(env.reset())
+        done = False
+        t_old = t
+        dissims_ = []
+
+        # Until the agent gets stuck in a hole or reaches the goal, keep training it
+        while not done:
+            rnd = np.random.random()
+
+            if rnd < epsilon:
+                action = env.action_space.sample()
+            else:
+                action = np.argmax(qtable[state])
+                
+            # Implement this action and move the agent in the desired direction
+            new_state, reward, done, info = env.step(action)
+            new_state = tuple(new_state)
+
+            rewards.append(reward)
+            dissims_.append(info['dissim'])
+
+            if t % 500 == 0 and t > 0:
+                model._tb_write("rollout//reward", np.mean(rewards[-100:]), t)
+                model._tb_write("rollout//ep_len", np.mean(ep_len[-100:]), t)
+                model._tb_write("rollout//dissim", np.mean(dissims[-100:]), t)
+
+            t += 1
+
+            # Update Q(s,a)
+            qtable[state][action] = qtable[state][action] + \
+                                    alpha * (reward + gamma * np.max(qtable[new_state]) - qtable[state][action])
+            
+            # Update our current state
+            state = new_state
+
+        if e % 100 == 0:
+            avg = evaluate(test_env, qtable)
+            model._tb_write("eval//dissim", avg, t)
+
+        dissims.append(info['dissim'])
+        ep_len.append(t - t_old)
+        epsilon = max(epsilon - epsilon_decay, 0.05)
+
+    evaluate(test_env, qtable, eps=2, render=True)
+
+    # for _ in range(2):
+    #     state = env.reset(threshold_i=14)
+    #     done = False
+
+    #     # Until the agent gets stuck in a hole or reaches the goal, keep training it
+    #     while True:
+    #         action = np.argmax(qtable[state])
+                
+    #         # Implement this action and move the agent in the desired direction
+    #         new_state, reward, done, info = env.step(action)
+            
+    #         # Update our current state
+    #         state = new_state
+
+    #         print(reward, done, info)
+    #         env.render()
+
+    #     print('done')
+
+    # print('Q-table after training:')
+    # print(json.dumps(qtable, indent=4))
