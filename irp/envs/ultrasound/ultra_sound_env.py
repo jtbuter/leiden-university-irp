@@ -67,6 +67,7 @@ class UltraSoundEnv(gym.Env):
         biggest_object = max(contours, key=cv2.contourArea)
         object_area = irp.utils.get_area(biggest_object)
 
+        # We found objects, but they are single pixels or lines
         if object_area == 0:
             object_area = 1.
             compactness = 0.

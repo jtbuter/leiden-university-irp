@@ -49,13 +49,20 @@ def compute_dissimilarity(bit_mask, label):
 def read_image(path):
     return cv2.imread(path, cv2.IMREAD_GRAYSCALE)
 
-def extract_subimages(image, subimage_width, subimage_height):
+def extract_subimages(image, subimage_width, subimage_height, overlap=0):
     height, width = image.shape
     subimages, coords = [], []
 
-    for y in range(0, height, subimage_height):
-        for x in range(0, width, subimage_width):
+    height_step_size = int(subimage_height * (1 - overlap))
+    width_step_size = int(subimage_width * (1 - overlap))
+
+    sizes = []
+
+    for y in range(0, height - (subimage_height - height_step_size), height_step_size):
+        for x in range(0, width - (subimage_width - width_step_size), width_step_size):
             subimage = image[y:y + subimage_height, x:x + subimage_width]
+
+            sizes.append(subimage.size)
 
             subimages.append(subimage)
             coords.append((x, y))
@@ -239,3 +246,57 @@ def get_subimages(filename, width=32, height=16):
     sublabels = extract_subimages(label, width, height)[0]
 
     return subimages, sublabels
+
+def id_to_coord(id, image, subimage_width, subimage_height, overlap=0):
+    height, width = image.shape
+    i = 0
+
+    height_step_size = int(subimage_height * (1 - overlap))
+    width_step_size = int(subimage_width * (1 - overlap))
+
+    for y in range(0, height - (subimage_height - height_step_size), height_step_size):
+        for x in range(0, width - (subimage_width - width_step_size), width_step_size):
+            if i == id:
+                return (x, y)
+
+            i += 1
+
+def coord_to_id(coord, image, subimage_width, subimage_height, overlap=0):
+    height, width = image.shape
+    i = 0
+
+    height_step_size = int(subimage_height * (1 - overlap))
+    width_step_size = int(subimage_width * (1 - overlap))
+
+    for y in range(0, height - (subimage_height - height_step_size), height_step_size):
+        for x in range(0, width - (subimage_width - width_step_size), width_step_size):
+            if (x, y) == coord:
+                return i
+
+            i += 1
+
+def unravel_index(i, width, height, divisor=512):
+    x, y = (i * width) % divisor, ((i * width) // divisor) * height
+
+    return x, y
+
+def get_neighborhood(coord: Union[int, Tuple], image, subimage_width, subimage_height, overlap=0, n_size=1):
+    if isinstance(coord, int):
+        coord = id_to_coord(coord, image, subimage_width, subimage_height, overlap)
+
+    width_step_size = int((1 - overlap) * subimage_width)
+    height_step_size = int((1 - overlap) * subimage_height)
+
+    x, y = coord
+    coords = []
+
+    for y_i in range(-n_size, n_size + 1):
+        y_i *= height_step_size
+
+        for x_i in range(-n_size, n_size + 1):
+            x_i *= width_step_size
+
+            coords.append((x + x_i, y + y_i))
+
+    return tuple(coords)
+    # print(coord, width_step_size, height_step_size)

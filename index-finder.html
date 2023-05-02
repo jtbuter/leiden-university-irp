@@ -11,6 +11,10 @@
             #gridder > div:hover {
                 opacity: 0.7
             }
+
+            .hovering {
+                opacity: 0.7 !important;
+            }
         </style>
     </head>
     <body style="margin:0">
@@ -22,11 +26,14 @@
             </div>
             <div>
                 <input type="text" id="name" value="case10_10" tabindex="1">
-                <input type="text" id="dims" value="32 16" autofocus tabindex="2">
+                <input type="text" id="dims" value="16 8" autofocus tabindex="2"><br>
+                <input type="text" id="idx">
+                <input type="text" id="coordx">
             </div>
-            <span style="display: inline-block" id="idx"></span>
         </div>
         <script>
+            var elX = 0;
+
             function sleep(ms) {
                 return new Promise(resolve => setTimeout(resolve, ms));
             }
@@ -41,7 +48,15 @@
             var width = 0;
             var height = 0;
 
+            document.querySelector("#gridder").addEventListener("mouseover", (e) => {
+                if (elX) {
+                    elX.classList.remove('hovering');
+                    elX = 0;
+                }
+            });
+
             document.querySelector("#dims").addEventListener("input", (e) => {
+                var divs = []
                 var gridder = document.querySelector("#gridder");
                 gridder.innerHTML = "";
 
@@ -51,7 +66,8 @@
                 height = res[1]
 
                 if (512 % height == 0 & 512 % width == 0 & width > 1 & height > 1) {
-                    document.querySelector('#idx').textContent = '';
+                    document.querySelector('#idx').value = '';
+                    document.querySelector('#coordx').value = '';
 
                     for (var i = 0; i < (512 / width) * (512 / height); i++) {
                         var div = document.createElement('div');
@@ -64,17 +80,77 @@
                         // div.style.backgroundColor = 'blue';
 
                         div.addEventListener('mouseover', (e) => {
-                            document.querySelector('#idx').textContent = e.target.id.replace('subimg', '');
+                            document.querySelector('#idx').value = e.target.id.replace('subimg', '');
+                            document.querySelector('#coordx').value = e.target.getAttribute('coord-xy')
                         });
-
+                        
                         gridder.appendChild(div)
+                        divs.push(div)
+                    }
+
+                    for (var i = 0; i < (512 / width) * (512 / height); i++) {
+                        var div = divs[i]
+
+                        var bodyRect = document.body.getBoundingClientRect()
+                        var elemRect = div.getBoundingClientRect()
+                        var offsetY = elemRect.top - bodyRect.top;
+                        var offsetX = elemRect.left - bodyRect.left;
+
+                        div.setAttribute('coord-xy', offsetX + " " + offsetY);
                     }
                 } else {
-                    document.querySelector('#idx').textContent = 'invalid dims'
+                    document.querySelector('#idx').value = 'invalid dims'
+                    document.querySelector('#coordx').value = 'invalid dims'
                 }
             });
 
             document.querySelector("#dims").dispatchEvent(new Event('input', {bubbles:true}));
+            
+            document.querySelector("#idx").addEventListener('keydown', e => {
+                if (e.keyCode != 13) return;
+
+                if (elX) {
+                    elX.classList.remove('hovering');
+                }
+
+                var id = e.target.value;
+                elX = document.querySelector('#subimg' + id);
+                
+                if (elX) {
+                    elX.classList.add('hovering');
+
+                    console.log(elX);
+                }
+            });
+            
+            document.querySelector("#coordx").addEventListener('keydown', e => {
+                if (e.keyCode != 13) return;
+
+                if (elX) {
+                    elX.classList.remove('hovering');
+                }
+
+                var id = e.target.value;
+                elX = document.querySelector('[coord-xy="' + e.target.value + '"]');
+                
+                if (elX) {
+                    elX.classList.add('hovering');
+
+                    console.log(elX);
+                }
+            });
+
+            document.querySelector("#idx").addEventListener("input", (e) => {
+                if (e.target.value == "" & elX) {
+                    elX.classList.remove('hovering');
+                }
+            });
+
+            document.querySelector("#coordx").addEventListener("input", (e) => {
+                if (e.target.value == "" & elX) {
+                    elX.classList.remove('hovering');
+                }
+            });
 
             document.querySelector("#name").addEventListener("input", (e) => {
                 // document.querySelector('#idx').textContent = '';

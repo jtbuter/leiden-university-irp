@@ -50,25 +50,8 @@ def evaluate(test_env: Env, qtable, render=False, eps=10):
 
     return sum(dissims) / eps
 
-if __name__ == "__main__":
-    subimages, sublabels = irp.utils.get_subimages('case10_11.png')
-    subimage, sublabel = subimages[184], sublabels[184]
-
-    env = Env(subimage, sublabel, 15)
-    env = TimeLimit(env, 15)
-    bins = (140, 140, 140)
-    env = Discretize(env, [0, 0, 0], [1, 1, 139], bins)
-    test_env = make_test_env(env)
-
-    qtable = np.zeros(bins + (3,))
-
-    # Hyperparameters
-    episodes = 5000        # Total number of episodes
-    alpha = 0.5            # Learning rate
-    gamma = 0.9            # Discount factor
-    epsilon = 1.0          # Amount of randomness in the action selection
-    epsilon_decay = 0.01  # Fixed amount to decrease
-
+def learn(env, episodes, alpha, gamma, epsilon, epsilon_decay, min_eps, learn_delay=0):
+    qtable = np.zeros(tuple(env.observation_space.nvec) + (3,))
     model = irp.q.Q(env, 0.0, tensorboard_log=os.path.join(ROOT_DIR, 'results/goal_feasability'))
     model.learn(0)
 
@@ -99,10 +82,11 @@ if __name__ == "__main__":
             rewards.append(reward)
             dissims_.append(info['dissim'])
 
-            if t % 500 == 0 and t > 0:
-                model._tb_write("rollout//reward", np.mean(rewards[-100:]), t)
-                model._tb_write("rollout//ep_len", np.mean(ep_len[-100:]), t)
-                model._tb_write("rollout//dissim", np.mean(dissims[-100:]), t)
+            # if t % 100 == 0 and t > 0:
+            #     model._tb_write("rollout//reward", np.mean(rewards[-100:]), t)
+            #     model._tb_write("rollout//ep_len", np.mean(ep_len[-100:]), t)
+            #     model._tb_write("rollout//dissim", np.mean(dissims[-100:]), t)
+            #     model._tb_write("rollout//epsilon", epsilon, t)
 
             t += 1
 
@@ -113,13 +97,46 @@ if __name__ == "__main__":
             # Update our current state
             state = new_state
 
+        if e % 10 == 0:
+            model._tb_write("rollout//reward", np.mean(rewards[-100:]), e)
+            model._tb_write("rollout//ep_len", np.mean(ep_len[-100:]), e)
+            model._tb_write("rollout//dissim", np.mean(dissims[-100:]), e)
+            model._tb_write("rollout//epsilon", epsilon, e)
+
+
         if e % 100 == 0:
-            avg = evaluate(test_env, qtable)
+            # avg = evaluate(test_env, qtable)
+            avg = 1
             model._tb_write("eval//dissim", avg, t)
 
         dissims.append(info['dissim'])
         ep_len.append(t - t_old)
-        epsilon = max(epsilon - epsilon_decay, 0.05)
+
+        if e >= learn_delay:
+            epsilon = max(epsilon - epsilon_decay, min_eps)
+
+    return qtable
+
+if __name__ == "__main__":
+    subimages, sublabels = irp.utils.get_subimages('case10_11.png')
+    subimage, sublabel = subimages[184], sublabels[184]
+
+    env = Env(subimage, sublabel, 15)
+    # env = TimeLimit(env, 15)
+    bins = (140, 140, 140)
+    env = Discretize(env, [0, 0, 0], [1, 1, 139], bins)
+    test_env = make_test_env(env)
+
+    # Hyperparameters
+    episodes = 1000        # Total number of episodes
+    alpha = 0.5            # Learning rate
+    gamma = 0.9            # Discount factor
+    epsilon = 1.0          # Amount of randomness in the action selection
+    epsilon_decay = 0.01  # Fixed amount to decrease
+
+    qtable = learn(
+        env, episodes, alpha, gamma, epsilon, epsilon_decay
+    )
 
     evaluate(test_env, qtable, eps=2, render=True)
 

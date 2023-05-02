@@ -1,60 +1,108 @@
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-from sklearn.model_selection import RandomizedSearchCV
-from scipy.stats import uniform
 from irp.experiments.goal_feasability.env import Env
 import irp.experiments.goal_feasability.q as q
 import irp.utils
 import irp.envs
 import numpy as np
-from irp.wrappers import Discretize
+from irp.wrappers import Discretize, MultiSample
 from irp.envs.ultrasound.ultra_sound_env import UltraSoundEnv
 import matplotlib.pyplot as plt
 import cv2
+from gym.wrappers import TimeLimit
 
 width, height = 16, 8
+subimages, sublabels = np.asarray(irp.utils.get_subimages(f'case10_10.png', width=width, height=height))
 
-for j in range(5, 17):
-    subimages, sublabels = np.asarray(irp.utils.get_subimages(f'case10_{j}.png', width=width, height=height))
+n_thresholds = 6
 
-    # 1889, 1890
-    # 1953, 1954
+subimages = subimages[np.array([1070, 1071, 1102, 1103])]
+sublabels = sublabels[np.array([1070, 1071, 1102, 1103])]
 
-    n_thresholds = 15
-    best_intensities = np.zeros((int(512 / height), int(512 / width)))
+dims = (4, 4, 2)
 
-    for i, (subimage, sublabel) in enumerate(zip(subimages, sublabels)):
-        if np.max(sublabel) == 0:
-            continue
+for i, subimage in zip([1070, 1071, 1102, 1103], subimages):
+    areas, compactnesses, objects = [], [], []
+    train_pairs = []
+    tis = np.linspace(np.min(subimage), np.max(subimage), n_thresholds)
 
-        intensities = np.linspace(np.min(subimage), np.max(subimage), n_thresholds, dtype=np.uint8).tolist()
-        best_dissim = np.inf
-        best_intensity = -1
+    for ti in tis:
+        bitmask = irp.envs.utils.apply_threshold(subimage, ti)
+        area, compactness, obj = np.round(np.asarray(UltraSoundEnv.observation(bitmask)), 3)
 
-        for threshold_i in range(15):
-            for size in [0, 2, 5]:
-                intensity = intensities[threshold_i]
-                bit_mask = irp.envs.utils.apply_threshold(subimage, intensity)
-                bit_mask = irp.envs.utils.apply_opening(bit_mask, size)
-                dissim = irp.envs.utils.compute_dissimilarity(bit_mask, sublabel)
+        train_pairs.append((area, compactness, obj))
 
-                if dissim < best_dissim:
-                    best_dissim = dissim
-                    best_intensity = intensity
+        areas.append(area)
+        compactnesses.append(compactness)
+        objects.append(obj)
 
-        best_intensities[np.unravel_index(i, best_intensities.shape)] = best_dissim
+    print(i, 'odd one' if i == 1103 else '')
+    print('train area', sorted(set(areas)))
+    print('train compactness', sorted(set(compactnesses)))
+    print('train objects', sorted(set(objects)))
+    print('train pairs', set(train_pairs))
+    print('train disc pairs', set(irp.utils.discrete(pair, Discretize.make_state_bins(dims, (0, 0, 1), (1, 1, dims[2]))) for pair in train_pairs))
 
-    print(
-        round(np.mean(best_intensities[best_intensities > 0]), 3), round(np.std(best_intensities[best_intensities > 0]), 3)
-    )
+    print()
 
-    ax = plt.subplot()
-    im = ax.imshow(best_intensities)
+    
 
-    # create an Axes on the right side of ax. The width of cax will be 5%
-    # of ax and the padding between cax and ax will be fixed at 0.05 inch.
-    divider = make_axes_locatable(ax)
-    cax = divider.append_axes("right", size="5%", pad=0.05)
+# raise Exception
 
-    plt.colorbar(im, cax=cax)
+# print('train area', sorted(set(areas)))
+# print('train compactness', sorted(set(compactnesses)))
+# print('train objects', sorted(set(objects)))
 
-    plt.show()
+subimages, sublabels = np.asarray(irp.utils.get_subimages(f'case10_11.png', width=width, height=height))
+
+subimages = subimages[np.array([1102])]
+sublabels = sublabels[np.array([1102])]
+
+areas, compactnesses, objects = [], [], []
+
+test_pairs = []
+
+for subimage in subimages:
+    tis = np.linspace(np.min(subimage), np.max(subimage), n_thresholds)
+
+    for ti in tis:
+        bitmask = irp.envs.utils.apply_threshold(subimage, ti)
+        area, compactness, obj = np.round(np.asarray(UltraSoundEnv.observation(bitmask)), 3)
+
+        test_pairs.append((area, compactness, obj))
+
+        areas.append(area)
+        compactnesses.append(compactness)
+        objects.append(obj)
+
+print('test area', sorted(set(areas)))
+print('test compactness', sorted(set(compactnesses)))
+print('test objects', sorted(set(objects)))
+print('test pairs', set(test_pairs))
+print('test disc pairs', set(irp.utils.discrete(pair, Discretize.make_state_bins(dims, (0, 0, 1), (1, 1, dims[2]))) for pair in test_pairs))
+
+dims = (4, 4, 2)
+
+train_discs = set()
+
+# for pair in train_pairs:
+    # train_discs.add(irp.utils.discrete(pair, Discretize.make_state_bins(dims, (0, 0, 1), (1, 1, dims[2]))))
+
+# for pair in test_pairs:
+#     print(irp.utils.discrete(pair, Discretize.make_state_bins(dims, (0, 0, 1), (1, 1, dims[2]))) in train_discs)
+
+
+# print(train_discs)
+
+# import cv2
+# import numpy as np
+# import matplotlib.pyplot as plt
+# import irp.utils
+
+# a = np.zeros((7, 7), dtype=np.uint8)
+# a[5:6,4:6] = 255
+
+# cnts = irp.utils.get_contours(a)
+# biggest = max(cnts, key=cv2.contourArea)
+
+# print(cv2.arcLength(biggest, True), irp.utils.get_compactness(biggest, 2))
+
+# plt.imshow(a); plt.show()
