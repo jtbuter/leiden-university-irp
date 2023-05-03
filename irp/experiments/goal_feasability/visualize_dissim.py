@@ -81,6 +81,7 @@ for width, height in [(16, 8)]:
         fig, axes = plt.subplots(ncols=3, nrows=2, figsize=(15, 15))
 
         axes = axes.flatten()
+
         for ax in axes:
             ax.imshow(label, cmap='gray')
 
@@ -89,7 +90,8 @@ for width, height in [(16, 8)]:
             axes[1].imshow(best_solvables, alpha=0.8),
             axes[2].imshow(best_comps, alpha=0.8),
             axes[3].imshow(best_areas, alpha=0.8),
-            axes[4].imshow(best_objects, alpha=0.8)
+            axes[4].imshow(best_objects, alpha=0.8),
+            axes[5].imshow(label, alpha=0.8)
         ]
 
         axes[0].title.set_text('Dissimilarity')
@@ -97,6 +99,7 @@ for width, height in [(16, 8)]:
         axes[2].title.set_text('Compactness')
         axes[3].title.set_text('Area')
         axes[4].title.set_text('Objects')
+        axes[5].title.set_text('Label')
 
         for im, ax in zip(ims, axes):
             # create an Axes on the right side of ax. The width of cax will be 5%
@@ -107,6 +110,7 @@ for width, height in [(16, 8)]:
             cbar = plt.colorbar(im, cax=cax)
             cbar.solids.set(alpha=1)
 
-        plt.axis([200, 400, 150, 300])
+            ax.set_xlim([180, 360])
+            ax.set_ylim([300, 150])
         # fig.tight_layout()
         plt.show()

@@ -55,7 +55,6 @@ def extract_subimages(image, subimage_width, subimage_height, overlap=0):
 
     height_step_size = int(subimage_height * (1 - overlap))
     width_step_size = int(subimage_width * (1 - overlap))
-
     sizes = []
 
     for y in range(0, height - (subimage_height - height_step_size), height_step_size):
@@ -66,6 +65,8 @@ def extract_subimages(image, subimage_width, subimage_height, overlap=0):
 
             subimages.append(subimage)
             coords.append((x, y))
+
+    assert len(set(sizes)) == 1, f"Subimages have differing sizes: {set(sizes)}"
 
     return subimages, coords
 
