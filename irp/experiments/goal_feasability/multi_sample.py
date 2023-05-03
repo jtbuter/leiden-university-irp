@@ -20,11 +20,11 @@ n_thresholds = 6
 subimages = subimages[np.array([1070, 1071, 1102, 1103])]
 sublabels = sublabels[np.array([1070, 1071, 1102, 1103])]
 
-bins = (4, 4, 1)
+bins = (4, 4, 2)
 
 envs = [
     # TimeLimit(Discretize(Env(sample, label, n_thresholds), [0, 0, 0], [1, 1, bins[2] - 1], bins), 30)
-    Discretize(Env(sample, label, n_thresholds), [0, 0, 0], [1, 1, bins[2] - 1], bins)
+    Discretize(Env(sample, label, n_thresholds), [0, 0, 1], [1, 1, bins[2]], bins)
     for sample, label in zip(subimages, sublabels)
 ]
 

@@ -61,7 +61,7 @@ def learn(env, episodes, alpha, gamma, epsilon, epsilon_decay, min_eps, learn_de
     dissims = []
 
     for e in range(episodes):
-        state = tuple(env.reset())
+        state = tuple(env.reset(threshold_i=None))
         done = False
         t_old = t
         dissims_ = []
@@ -97,6 +97,10 @@ def learn(env, episodes, alpha, gamma, epsilon, epsilon_decay, min_eps, learn_de
             # Update our current state
             state = new_state
 
+
+        dissims.append(info['dissim'])
+        ep_len.append(t - t_old)
+
         if e % 10 == 0:
             model._tb_write("rollout//reward", np.mean(rewards[-100:]), e)
             model._tb_write("rollout//ep_len", np.mean(ep_len[-100:]), e)
@@ -108,9 +112,6 @@ def learn(env, episodes, alpha, gamma, epsilon, epsilon_decay, min_eps, learn_de
             # avg = evaluate(test_env, qtable)
             avg = 1
             model._tb_write("eval//dissim", avg, t)
-
-        dissims.append(info['dissim'])
-        ep_len.append(t - t_old)
 
         if e >= learn_delay:
             epsilon = max(epsilon - epsilon_decay, min_eps)

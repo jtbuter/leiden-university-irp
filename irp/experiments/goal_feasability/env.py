@@ -18,11 +18,13 @@ class Env(gym.Env):
 
         self.sample = sample
         self.label = label
-        self.n_thresholds = n_thresholds
         self.threshold_i = None
-        self.intensities = np.linspace(np.min(sample), np.max(sample), n_thresholds, dtype=np.uint8).tolist()
+        mini, maxi = np.min(sample), np.max(sample)
+        self.intensities = np.linspace(mini, maxi, n_thresholds, dtype=np.uint8).tolist()
+        self.intensities = np.concatenate(([mini-1], self.intensities))
+        self.n_thresholds = n_thresholds + 1
 
-        self.observation_space = gym.spaces.Discrete(n=15)
+        self.observation_space = gym.spaces.Discrete(n=self.n_thresholds)
         self.action_space = gym.spaces.Discrete(n=3)
 
     def step(self, action) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:

@@ -7,7 +7,7 @@ from scipy.ndimage import median_filter
 import matplotlib.pyplot as plt
 
 subimage_width, subimage_height = 16, 8
-filename = 'case10_11.png'
+filename = 'case10_10.png'
 
 # Define the paths to the related parent directories
 base_path = os.path.join(irp.GIT_DIR, "../data/trus/")
@@ -24,16 +24,22 @@ overlap = 0.5
 subimages = np.asarray(irp.utils.extract_subimages(image, subimage_width, subimage_height, overlap=overlap)[0])
 sublabels = np.asarray(irp.utils.extract_subimages(label, subimage_width, subimage_height, overlap=overlap)[0])
 
-neighborhood = irp.utils.get_neighborhood((240, 272), image, 16, 8, overlap=overlap, n_size=1)
+neighborhood = irp.utils.get_neighborhood((240, 272), image, 16, 8, overlap=overlap, n_size=2)
 n_thresholds = 6
+
+a = np.zeros((512, 512))
 
 for neighbor in neighborhood:
     id = irp.utils.coord_to_id(neighbor, image, 16, 8, overlap=overlap)
     subimage = subimages[id]
     sublabel = sublabels[id]
 
+    mini, maxi = np.min(subimage), np.max(subimage)
+
+    tis = np.linspace(mini, maxi, n_thresholds, dtype=np.uint8).tolist()
+    tis = np.concatenate(([mini - 1], tis))
+
     best_dissim = np.inf
-    tis = np.linspace(np.min(subimage), np.max(subimage), n_thresholds)
     best_bitmask = -1
 
     for ti in tis:
@@ -45,8 +51,13 @@ for neighbor in neighborhood:
             best_bitmask = bitmask
 
     print(neighbor, id, best_dissim <= 0.05)
+    x, y = neighbor
+    # a[y:y+8,x:x+16] = sublabel
 
-    if best_dissim > 0.05:
+    if best_dissim > 0.12:
         plt.title(str(best_dissim))
         plt.imshow(np.hstack([subimage, sublabel, best_bitmask]), cmap='gray')
         plt.show()
+
+# plt.imshow(a)
+# plt.show()

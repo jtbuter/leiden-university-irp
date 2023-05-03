@@ -232,7 +232,7 @@ def parse_highs(area, compactness, objects, label):
         'objects': objects
     }
 
-def get_subimages(filename, width=32, height=16):
+def get_subimages(filename, width=32, height=16, overlap=0):
     # Define the paths to the related parent directories
     base_path = os.path.join(irp.GIT_DIR, "../data/trus/")
     image_path = os.path.join(base_path, 'images')
@@ -242,13 +242,13 @@ def get_subimages(filename, width=32, height=16):
     image = median_filter(image, 7)
     label = read_image(os.path.join(label_path, filename))
 
-    subimages = extract_subimages(image, width, height)[0]
-    sublabels = extract_subimages(label, width, height)[0]
+    subimages = extract_subimages(image, width, height, overlap)[0]
+    sublabels = extract_subimages(label, width, height, overlap)[0]
 
     return subimages, sublabels
 
-def id_to_coord(id, image, subimage_width, subimage_height, overlap=0):
-    height, width = image.shape
+def id_to_coord(id, shape, subimage_width, subimage_height, overlap=0):
+    height, width = shape
     i = 0
 
     height_step_size = int(subimage_height * (1 - overlap))
@@ -261,8 +261,8 @@ def id_to_coord(id, image, subimage_width, subimage_height, overlap=0):
 
             i += 1
 
-def coord_to_id(coord, image, subimage_width, subimage_height, overlap=0):
-    height, width = image.shape
+def coord_to_id(coord, shape, subimage_width, subimage_height, overlap=0):
+    height, width = shape
     i = 0
 
     height_step_size = int(subimage_height * (1 - overlap))
@@ -280,9 +280,9 @@ def unravel_index(i, width, height, divisor=512):
 
     return x, y
 
-def get_neighborhood(coord: Union[int, Tuple], image, subimage_width, subimage_height, overlap=0, n_size=1):
+def get_neighborhood(coord: Union[int, Tuple], shape, subimage_width, subimage_height, overlap=0, n_size=1) -> Tuple[int, ...]:
     if isinstance(coord, int):
-        coord = id_to_coord(coord, image, subimage_width, subimage_height, overlap)
+        coord = id_to_coord(coord, shape, subimage_width, subimage_height, overlap)
 
     width_step_size = int((1 - overlap) * subimage_width)
     height_step_size = int((1 - overlap) * subimage_height)
