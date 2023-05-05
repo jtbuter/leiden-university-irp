@@ -31,6 +31,7 @@ for width, height in [(16, 8)]:
         best_comps = np.zeros((512, 512))
         best_areas = np.zeros((512, 512))
         best_objects = np.zeros((512, 512))
+        difficulty = np.zeros((512, 512))
         mean_intensities = []
 
         for i, (subimage, sublabel) in enumerate(zip(subimages, sublabels)):
@@ -62,10 +63,14 @@ for width, height in [(16, 8)]:
             # best_intensities[i * height, i * width] = best_dissim
             x, y = unravel_index(i, width, height, 512)
             best_intensities[y:y+height, x:x+width] = best_dissim
-            best_solvables[y:y+height, x:x+width] = float(best_dissim) <= 0.05
+            best_solvables[y:y+height, x:x+width] = float(best_dissim) <= 0.08
             best_comps[y:y+height, x:x+width] = best_comp
             best_areas[y:y+height, x:x+width] = best_area
             best_objects[y:y+height, x:x+width] = best_obj
+            difficulty[y:y+height, x:x+width] = float(best_dissim) >= 0.03
+
+            if float(best_dissim) >= 0.03:
+                print(x, y)
 
             # print(j, np.mean(mean_intensities), np.std(mean_intensities))
 
@@ -91,7 +96,7 @@ for width, height in [(16, 8)]:
             axes[2].imshow(best_comps, alpha=0.8),
             axes[3].imshow(best_areas, alpha=0.8),
             axes[4].imshow(best_objects, alpha=0.8),
-            axes[5].imshow(label, alpha=0.8)
+            axes[5].imshow(difficulty, alpha=0.8)
         ]
 
         axes[0].title.set_text('Dissimilarity')
@@ -99,7 +104,7 @@ for width, height in [(16, 8)]:
         axes[2].title.set_text('Compactness')
         axes[3].title.set_text('Area')
         axes[4].title.set_text('Objects')
-        axes[5].title.set_text('Label')
+        axes[5].title.set_text('Difficult')
 
         for im, ax in zip(ims, axes):
             # create an Axes on the right side of ax. The width of cax will be 5%

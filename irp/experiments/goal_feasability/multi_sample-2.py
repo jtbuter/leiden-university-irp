@@ -11,12 +11,21 @@ import os
 from scipy.ndimage import median_filter
 from gym.wrappers import TimeLimit
 
-for coord in ((256, 240), (240, 272), (240, 264), (320, 200)):
+for coord in [
+    # (240, 224),
+    # (256, 224),
+    # (272, 224),
+    # (240, 240),
+    # (256, 240),
+    # (272, 240)
+    # (224, 264),
+    (256, 184)
+]:
     subimage_width, subimage_height = 16, 8
     # Train filename
     filename = 'case10_10.png'
     n_thresholds = 6
-    bins = (5, 5, 4)
+    bins = (3, 3, 4)
     # Hyperparameters
     params = {
         'episodes': 5000, 'alpha': 0.3, 'gamma': 0.9,
@@ -58,6 +67,8 @@ for coord in ((256, 240), (240, 272), (240, 264), (320, 200)):
         best_dissim = np.inf
         best_bitmask = -1
 
+        print(tis)
+
         for ti in tis:
             bitmask = irp.envs.utils.apply_threshold(subimage, ti)
             dissim = irp.envs.utils.compute_dissimilarity(bitmask, sublabel)
@@ -69,6 +80,11 @@ for coord in ((256, 240), (240, 272), (240, 264), (320, 200)):
         if best_dissim <= 0.08:
             subimages_.append(subimage)
             sublabels_.append(sublabel)
+        elif best_dissim >= 0.15:
+            plt.imshow(np.hstack([subimage, sublabel, best_bitmask]), cmap='gray')
+            plt.show()
+            
+
 
     envs = [
         TimeLimit(Discretize(Env(sample, label, n_thresholds), [0, 0, 1], [1, 1, bins[2]], bins), 30)
@@ -77,6 +93,7 @@ for coord in ((256, 240), (240, 272), (240, 264), (320, 200)):
 
     env: Env = MultiSample(envs)
 
+    print('Training on', len(subimages_), "labels")
 
     qtable = q.learn(
         env, **params

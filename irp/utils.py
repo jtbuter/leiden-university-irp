@@ -118,9 +118,11 @@ def get_dims(*args):
     return dims
 
 def discrete(sample, grid) -> Tuple[int, ...]:
-    return tuple(int(np.digitize(s, g)) for s, g in zip(sample, grid))
+    # TODO: Checken of searchsorted en digitize dezelfde resultaten geven
+    # return tuple(int(np.digitize(s, g)) for s, g in zip(sample, grid))
+    return tuple(int(np.searchsorted(g, s)) for s, g in zip(sample, grid))
 
-def make_sample_label(*file_names, idx=184, width=32, height=16):
+def make_sample_label(*file_names, idx=184, width=32, height=16, overlap=0):
     base_path = os.path.join(irp.ROOT_DIR, "../../data/trus/")
     image_path = os.path.join(base_path, 'images')
     label_path = os.path.join(base_path, 'labels')
@@ -132,14 +134,18 @@ def make_sample_label(*file_names, idx=184, width=32, height=16):
         image = median_filter(image, 7)
         label = read_image(os.path.join(label_path, file_name))
 
-        subimages, coords = extract_subimages(image, width, height)
-        sublabels, coords = extract_subimages(label, width, height)
+        subimages, coords = extract_subimages(image, width, height, overlap)
+        sublabels, coords = extract_subimages(label, width, height, overlap)
 
-        subimage = subimages[idx]
-        sublabel = sublabels[idx]
+        if idx is None:
+            images.append(subimages)
+            labels.append(sublabels)
+        else:
+            subimage = subimages[idx]
+            sublabel = sublabels[idx]
 
-        images.append(subimage)
-        labels.append(sublabel)
+            images.append(subimage)
+            labels.append(sublabel)
     
     return list(zip(images, labels))
 
@@ -281,7 +287,7 @@ def unravel_index(i, width, height, divisor=512):
 
     return x, y
 
-def get_neighborhood(coord: Union[int, Tuple], shape, subimage_width, subimage_height, overlap=0, n_size=1) -> Tuple[int, ...]:
+def get_neighborhood(coord: Union[int, Tuple], shape, subimage_width, subimage_height, overlap=0, n_size=1) -> List[Tuple]:
     if isinstance(coord, int):
         coord = id_to_coord(coord, shape, subimage_width, subimage_height, overlap)
 
@@ -299,5 +305,30 @@ def get_neighborhood(coord: Union[int, Tuple], shape, subimage_width, subimage_h
 
             coords.append((x + x_i, y + y_i))
 
-    return tuple(coords)
+    return coords
     # print(coord, width_step_size, height_step_size)
+
+def get_neighborhood_images(subimages, sublabels, coord: Union[int, Tuple], shape, subimage_width, subimage_height, overlap=0, n_size=1):
+    neighborhood_coords = irp.utils.get_neighborhood(coord, shape, subimage_width, subimage_height, overlap, n_size)
+    neighborhood_ids = [
+        coord_to_id(coord_, shape, subimage_width, subimage_height, overlap) for coord_ in neighborhood_coords
+    ]
+    
+    return np.asarray([subimages[i] for i in neighborhood_ids]), np.asarray([sublabels[i] for i in neighborhood_ids])
+
+def get_best_dissimilarity(subimage, sublabel, n_thresholds):
+    mini, maxi = np.min(subimage), np.max(subimage)
+    left_bound = np.asarray(max(0, mini - 1), dtype=np.uint8)
+
+    tis = np.concatenate(([left_bound], np.linspace(mini, maxi, n_thresholds, dtype=np.uint8))).tolist()
+    best_dissim = np.inf
+
+    for ti in tis:
+        bitmask = irp.envs.utils.apply_threshold(subimage, ti)
+        dissim = irp.envs.utils.compute_dissimilarity(bitmask, sublabel)
+
+        if dissim < best_dissim:
+            best_dissim = dissim
+
+    return float(best_dissim)
+

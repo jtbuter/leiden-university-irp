@@ -54,6 +54,10 @@ def compute_dissimilarity(
     label: np.ndarray
 ) -> float:
     # return np.sum(np.logical_xor(bit_mask, label)) / label.size
-
     height, width = label.shape
-    return (np.sum(np.logical_xor(bit_mask, label)) / (height * width)).astype(float)
+
+    xor = np.logical_xor(bit_mask, label)
+    summation = xor.sum()
+    normal = summation / (height * width)
+    
+    return normal.astype(float)

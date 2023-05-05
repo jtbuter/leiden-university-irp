@@ -1,5 +1,6 @@
 import hashlib
 import os
+from typing import Optional, Union
 import gym
 import random
 import numpy as np
@@ -50,10 +51,16 @@ def evaluate(test_env: Env, qtable, render=False, eps=10):
 
     return sum(dissims) / eps
 
-def learn(env, episodes, alpha, gamma, epsilon, epsilon_decay, min_eps, learn_delay=0):
+def learn(env, episodes, alpha, gamma, epsilon, epsilon_decay, min_eps, learn_delay=0, write_log: Optional[Union[irp.q.Q, bool]] = True):
+    model = None
+
+    if isinstance(write_log, irp.q.Q):
+        model = write_log
+    elif write_log is True:
+        model = irp.q.Q(env, 0.0, tensorboard_log=os.path.join(ROOT_DIR, 'results/goal_feasability'))
+        model.learn(0)
+
     qtable = np.zeros(tuple(env.observation_space.nvec) + (3,))
-    model = irp.q.Q(env, 0.0, tensorboard_log=os.path.join(ROOT_DIR, 'results/goal_feasability'))
-    model.learn(0)
 
     t = 0
     rewards = []
@@ -101,14 +108,14 @@ def learn(env, episodes, alpha, gamma, epsilon, epsilon_decay, min_eps, learn_de
         dissims.append(info['dissim'])
         ep_len.append(t - t_old)
 
-        if e % 10 == 0:
+        if e % 10 == 0 and write_log:
             model._tb_write("rollout//reward", np.mean(rewards[-100:]), e)
             model._tb_write("rollout//ep_len", np.mean(ep_len[-100:]), e)
             model._tb_write("rollout//dissim", np.mean(dissims[-100:]), e)
             model._tb_write("rollout//epsilon", epsilon, e)
 
 
-        if e % 100 == 0:
+        if e % 100 == 0 and write_log:
             # avg = evaluate(test_env, qtable)
             avg = 1
             model._tb_write("eval//dissim", avg, t)
