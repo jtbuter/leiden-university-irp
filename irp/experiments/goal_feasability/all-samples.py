@@ -1,33 +1,50 @@
-import matplotlib.pyplot as plt
-import numpy as np
-from irp.wrappers import Discretize, MultiSample
-import irp.utils
-import irp.envs
-from gym.wrappers import TimeLimit
+import cProfile
 from irp.experiments.goal_feasability.env import Env
 import irp.experiments.goal_feasability.q as q
+import irp.utils
+import irp.envs
+import irp
+import numpy as np
+from irp.wrappers import Discretize, MultiSample
+from irp.envs.ultrasound.ultra_sound_env import UltraSoundEnv
+import matplotlib.pyplot as plt
+import cv2
+import os
+from scipy.ndimage import median_filter
+from gym.wrappers import TimeLimit
 
-shape = (512, 512)
+# Train and test filename, and characteristics of the subimages
+train_name = 'case10_10.png'
+test_name = 'case10_11.png'
 subimage_width, subimage_height = 16, 8
+shape = (512, 512)
 overlap = 0.75
-n_size = 2
+
+# Get all the subimages
+train_Xs, train_ys = np.asarray(
+    irp.utils.make_sample_label(train_name, width=subimage_width, height=subimage_height, overlap=overlap, idx=None)
+)[0]
+test_Xs, test_ys = np.asarray(
+    irp.utils.make_sample_label(test_name, width=subimage_width, height=subimage_height, overlap=overlap, idx=None)
+)[0]
+
+# Define environment settings
 n_thresholds = 6
 bins = (3, 3, 4)
+n_size = 2
+delta = 0.08
+
+# Hyperparameters for learning
 params = {
-    'episodes': 5000, 'alpha': 0.3, 'gamma': 0.9,
+    'episodes': 500, 'alpha': 0.8, 'gamma': 0.9,
     'epsilon': 1.0, 'epsilon_decay': 0.0025, 'min_eps': 0.05, 'learn_delay': 1000
 }
+
 coords = irp.utils.extract_subimages(np.zeros((512, 512)), subimage_width, subimage_height, 0)[1]
 
-train_subimages, train_sublabels = np.asarray(irp.utils.make_sample_label(
-    'case10_10.png', width=subimage_width, height=subimage_height, overlap=overlap, idx=None
-)[0])
-test_subimages, test_sublabels = np.asarray(irp.utils.make_sample_label(
-    'case10_11.png', width=subimage_width, height=subimage_height, overlap=overlap, idx=None
-)[0])
-
+# Store resulting bitmasks to this array to visualize our final results
 result = np.zeros((512, 512))
-result2 = np.zeros((512, 512))
+failed = []
 
 for coord in coords:
     x, y = coord
@@ -36,74 +53,64 @@ for coord in coords:
     if not (x >= 192 and x <= 336 and y >= 176 and y <= 288):
         continue
 
-    print("Processing coord", coord)
+    idx = irp.utils.coord_to_id(coord, shape, subimage_width, subimage_height, overlap)
 
-    train_neighborhood_subimages = []
-    train_neighborhood_sublabels = []
-    neighborhood_coords = irp.utils.get_neighborhood(
-        coord, (512, 512), subimage_width, subimage_height, overlap=overlap, n_size=n_size
+    # Get the subimages in the neighborhood of the image we're analyzing
+    n_subimages, n_sublabels = irp.utils.get_neighborhood_images(
+        train_Xs, train_ys, coord, shape, subimage_width, subimage_height, overlap, n_size
     )
 
-    # Make sure all the subimages can actually be solved
-    for neighbor in neighborhood_coords:
-        id = irp.utils.coord_to_id(neighbor, (512, 512), subimage_width, subimage_height, overlap=overlap)
+    # Prepare images to actually use for training
+    train_Xy = []
 
-        subimage = train_subimages[id]
-        sublabel = train_sublabels[id]
+    # For now, only use subimage that actually contain a goal-state
+    for train_X, train_y in zip(n_subimages, n_sublabels):
+        solvable = irp.utils.get_best_dissimilarity(train_X, train_y, n_thresholds) <= delta
 
-        mini, maxi = np.min(subimage), np.max(subimage)
+        if solvable:
+            train_Xy.append((train_X, train_y))
 
-        tis = np.linspace(mini, maxi, n_thresholds, dtype=np.uint8).tolist()
-        tis = np.concatenate(([mini - 1], tis))
+    print(f"{coord}: Using {len(train_Xy)} samples to train on" + (', continuing...' if len(train_Xy) == 0 else ''))
 
-        best_dissim = np.inf
-        best_bitmask = -1
+    if len(train_Xy) == 0:
+        continue
 
-        for ti in tis:
-            bitmask = irp.envs.utils.apply_threshold(subimage, ti)
-            dissim = irp.envs.utils.compute_dissimilarity(bitmask, sublabel)
+    # Create a MultiSample environment to train on multiple subimages
+    envs = MultiSample([])
 
-            if dissim < best_dissim:
-                best_dissim = dissim
-                best_bitmask = bitmask
+    for train_X, train_y in train_Xy:
+        env = Env(train_X, train_y, n_thresholds, delta)
+        env = Discretize(env, [0, 0, 1], [1, 1, bins[2]], bins)
 
-        if best_dissim <= 0.08:
-            train_neighborhood_subimages.append(subimage)
-            train_neighborhood_sublabels.append(sublabel)
+        envs.add(env)
 
-    print("States used for learning:", len(train_neighborhood_subimages))
+    # Train the model
+    qtable = q.learn(envs, **params, write_log=False)
 
-    envs = [
-        TimeLimit(Discretize(Env(sample, label, n_thresholds), [0, 0, 1], [1, 1, bins[2]], bins), 30)
-        for sample, label in zip(train_neighborhood_subimages, train_neighborhood_sublabels)
-    ]
+    # Define the test filename and get all the subimages
+    test_X, test_y = test_Xs[idx], test_ys[idx]
 
-    env: Env = MultiSample(envs)
+    # Set-up and evaluate the environment
+    env = Env(test_X, test_y, n_thresholds, delta)
+    env = Discretize(env, [0, 0, 1], [1, 1, bins[2]], bins)
 
-    qtable = q.learn(env, **params)
-
-    # Set-up testing
-    id = irp.utils.coord_to_id(coord, (512, 512), subimage_width, subimage_height, overlap=0)
-    test_subimage, test_sublabel = test_subimages[id], test_sublabels[id]
-    env = Discretize(Env(test_subimage, test_sublabel, n_thresholds), [0, 0, 1], [1, 1, bins[2]], bins)
-
+    # Start at the very lowest threshold, i.e. lower than the lower sample.min() value
     s = env.reset(threshold_i=0)
 
-    for i in range(15):
-        a = np.argmax(qtable[tuple(s)])
-        s, r, d, i = env.step(a)
+    # Perform `n_thresholds` timesteps, as we should've found the result by then
+    for i in range(10): a = np.argmax(qtable[tuple(s)]); d, i = env.step(a)[-2:]
 
-    print(d)
+    print(d, i)
 
-    threshold_i = env.threshold_i
-    intensity = env.intensities[threshold_i]
-    bit_mask = irp.envs.utils.apply_threshold(test_subimage, intensity)
+    if not d:
+        failed.append(coord)
 
-    result[y:y+subimage_height, x:x+subimage_width] = bit_mask
-    result2[y:y+subimage_height, x:x+subimage_width] = test_sublabel
+    intensity = env.intensities[env.threshold_i]
+    bit_mask = irp.envs.utils.apply_threshold(test_X, intensity)
 
-# plt.imshow(result2, cmap='gray', vmin=0, vmax=1)
+    result[y:y + subimage_height, x:x + subimage_width] = bit_mask
+
+print('Failed on', failed)
+
 plt.imshow(result, cmap='gray', vmin=0, vmax=1)
 plt.show()
-
-

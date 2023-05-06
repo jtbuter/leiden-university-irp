@@ -322,6 +322,7 @@ def get_best_dissimilarity(subimage, sublabel, n_thresholds):
 
     tis = np.concatenate(([left_bound], np.linspace(mini, maxi, n_thresholds, dtype=np.uint8))).tolist()
     best_dissim = np.inf
+    best_bitmask = None
 
     for ti in tis:
         bitmask = irp.envs.utils.apply_threshold(subimage, ti)
@@ -329,6 +330,7 @@ def get_best_dissimilarity(subimage, sublabel, n_thresholds):
 
         if dissim < best_dissim:
             best_dissim = dissim
+            best_bitmask = bitmask
 
-    return float(best_dissim)
+    return float(best_dissim), best_bitmask
 

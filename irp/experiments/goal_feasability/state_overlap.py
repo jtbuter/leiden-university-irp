@@ -32,13 +32,13 @@ delta = 0.08
 
 # Hyperparameters for learning
 params = {
-    'episodes': 500, 'alpha': 0.3, 'gamma': 0.9,
+    'episodes': 5000, 'alpha': 0.3, 'gamma': 0.9,
     'epsilon': 1.0, 'epsilon_decay': 0.0025, 'min_eps': 0.05, 'learn_delay': 1000
 }
 # Coordinate we're analyzing right now
 # coord = (256, 184) # TODO: This is a difficult one, learn how to evaluate border subimages
 coords = [(272, 176), (256, 184), (288, 184), (304, 192), (224, 200), (320, 200), (320, 208), (208, 216), (320, 216), (208, 224), (320, 224), (208, 232), (336, 232), (192, 240), (192, 248), (192, 256), (192, 264), (272, 264), (336, 264), (208, 272), (240, 272), (256, 272), (336, 272), (208, 280), (224, 280), (304, 280), (320, 280), (336, 280), (304, 288), (320, 288)]
-coords = [(288, 208)]
+coords = [(272, 232)]
 
 for coord in coords:
     idx = irp.utils.coord_to_id(coord, shape, subimage_width, subimage_height, overlap)
@@ -58,7 +58,11 @@ for coord in coords:
         if solvable:
             train_Xy.append((subimage, sublabel))
 
-    print(f"Using {len(train_Xy)} samples for training")
+    print(f"{coord}: Using {len(train_Xy)} samples to train on" + (', continuing...' if len(train_Xy) == 0 else ''))
+
+    # We don't actually have any images to train on
+    if len(train_Xy) == 0:
+        continue
 
     # Create a MultiSample environment to train on multiple subimages
     envs = MultiSample([])
@@ -83,8 +87,9 @@ for coord in coords:
     env = Discretize(env, [0, 0, 1], [1, 1, bins[2]], bins)
     s = env.reset(threshold_i=0)
 
-    for i in range(n_thresholds): a = np.argmax(qtable[tuple(s)]); d, i = env.step(a)[-2:]
+    for i in range(n_thresholds + 1):
+        a = np.argmax(qtable[tuple(s)]); d, i = env.step(a)[-2:]
 
-    print(d, i)
+        print(d, i)
 
     # env.render()
