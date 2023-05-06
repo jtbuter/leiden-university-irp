@@ -53,16 +53,28 @@ def compute_dissimilarity(
     bitmask: np.ndarray,
     label: np.ndarray
 ) -> float:
-    height, width = label.shape
-
-    xor = np.logical_xor(bitmask, label)
-    summation = np.sum(xor)
-    normal = summation / (height * width)
-    
-    return normal.astype(float)
-
-def compute_dissimilarity_new(
-    bitmask: np.ndarray,
-    label: np.ndarray
-) -> float:
     return (bitmask != label).sum() / label.size
+
+def get_contours(
+    bitmask: np.ndarray
+) -> np.ndarray:
+    return cv2.findContours(bitmask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0]
+
+def get_compactness(
+    contour: np.ndarray,
+    object_area: float
+) -> float:
+    perimeter = cv2.arcLength(contour, True)
+
+    return (4 * np.pi * object_area) / (perimeter ** 2)
+
+def get_area(
+    contour: np.ndarray
+) -> float:
+    return cv2.contourArea(contour)
+
+def normalize_area(
+    bitmask: np.ndarray,
+    object_area: float
+) -> float:
+    return object_area / bitmask.size

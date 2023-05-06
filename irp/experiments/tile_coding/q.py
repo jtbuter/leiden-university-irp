@@ -19,9 +19,11 @@ def learn(environment, parameters):
     gamma = parameters['gamma']
     epsilon = parameters['epsilon']
     epsilon_decay = parameters['epsilon_decay']
+    learning_delay = parameters['learning_delay']
 
     # List of outcomes to plot
     outcomes = []
+    epsilons = []
 
     # Training
     for e in range(episodes):
@@ -57,7 +59,10 @@ def learn(environment, parameters):
             if reward:
                 outcomes[-1] = "Success"
 
-        # Update epsilon
-        epsilon = max(epsilon - epsilon_decay, 0)
+        if e >= learning_delay:
+            # Update epsilon
+            epsilon = max(epsilon - epsilon_decay, 0)
 
-    return qtable
+        epsilons.append(epsilon)
+
+    return qtable, epsilons

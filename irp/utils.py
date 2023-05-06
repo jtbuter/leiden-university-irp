@@ -15,6 +15,7 @@ from gym.wrappers import TimeLimit
 from scipy.ndimage import median_filter
 
 import irp.wrappers.discretize
+import irp.envs.utils
 # import irp.envs.sahba.sahba_2008_env
 
 if typing.TYPE_CHECKING:
@@ -90,3 +91,20 @@ def get_subimages(filename):
 def show(sample):
     plt.imshow(sample, vmin=0, vmax=255, cmap='gray')
     plt.show()
+
+def get_best_dissimilarity(
+    sample: np.ndarray,
+    label: np.ndarray,
+    n_thresholds: int
+)-> np.float64:
+    best = np.inf
+    tis = irp.envs.utils.get_intensity_spectrum(sample, n_thresholds)
+
+    for ti in tis:
+        bitmask = irp.envs.utils.apply_threshold(sample, ti)
+        dissim = irp.envs.utils.compute_dissimilarity(bitmask, label)
+
+        if dissim < best:
+            best = dissim
+
+    return best
