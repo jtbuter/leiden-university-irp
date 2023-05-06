@@ -1,14 +1,11 @@
 import numpy as np
+import irp.wrappers as wrappers
 
 def build_qtable(environment):
-    qtable = {}
-
-    for ti in range(environment.n_thresholds):
-        s = environment.reset(ti=ti)
-        qtable[s] = [0., 0., 0.]
+    dims = wrappers.utils.get_dims(environment.observation_space, environment.action_space)
+    qtable = np.zeros(dims)
 
     return qtable
-
 
 def learn(environment, parameters):
     # We re-initialize the Q-table
@@ -27,7 +24,7 @@ def learn(environment, parameters):
 
     # Training
     for e in range(episodes):
-        state = environment.reset()
+        state = tuple(environment.reset())
         done = False
 
         # By default, we consider our outcome to be a failure
@@ -44,9 +41,10 @@ def learn(environment, parameters):
             # Else, take the action with the highest value in the current state
             else:
                 action = np.argmax(qtable[state])
-                
+
             # Implement this action and move the agent in the desired direction
             new_state, reward, done, info = environment.step(action)
+            new_state = tuple(new_state)
 
             # Update Q(s,a)
             qtable[state][action] = qtable[state][action] + \

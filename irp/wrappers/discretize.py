@@ -2,7 +2,7 @@ from typing import Dict, List, Tuple, Union
 import gym
 from gym.spaces import Space
 import numpy as np
-import irp.utils
+import irp.wrappers as wrappers
 
 class Discretize(gym.Wrapper):
     def __init__(self, env: gym.Env, lows: Union[Dict, List], highs: Union[Dict, List], bins: Tuple):
@@ -31,7 +31,7 @@ class Discretize(gym.Wrapper):
             keys = range(len(lows))
 
         if isinstance(dims, Space):
-            dims = irp.utils.get_dims(dims)
+            dims = wrappers.utils.get_dims(dims)
 
         bins = dict(zip(keys, dims))
 
@@ -40,9 +40,9 @@ class Discretize(gym.Wrapper):
     def step(self, action):
         state, reward, done, info = self.env.step(action)
 
-        return np.asarray(irp.utils.discrete(state, self._state_bins)), reward, done, info
+        return np.asarray(wrappers.utils.discrete(state, self._state_bins)), reward, done, info
 
     def reset(self, **kwargs):
         state = self.env.reset(**kwargs)
 
-        return np.asarray(irp.utils.discrete(state, self._state_bins))
+        return np.asarray(wrappers.utils.discrete(state, self._state_bins))

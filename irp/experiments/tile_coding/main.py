@@ -5,6 +5,7 @@ import numpy as np
 import irp.utils
 import irp.envs as envs
 import matplotlib.pyplot as plt
+import irp.wrappers as wrappers
 
 # Hyperparameters
 parameters = {
@@ -25,7 +26,10 @@ best_d_sim = irp.utils.get_best_dissimilarity(sample, label, n_thresholds)
 
 print('Best possible dissimilarity:', best_d_sim)
 
+bins = (5, 5, 4)
+
 environment = env.Env(sample, label, n_thresholds)
+environment = wrappers.Discretize(environment, (0, 0, 1), (1, 1, bins[2]), bins)
 success = np.zeros((10,))
 
 for i in range(success.size):
@@ -34,11 +38,12 @@ for i in range(success.size):
     # Assert that we succeeded in learning
     success[i] = True
 
-    s = environment.reset(n_thresholds - 1)
+    s = tuple(environment.reset(ti=n_thresholds - 1))
 
     for j in range(10):
         a = np.argmax(qtable[s])
         s, r, d, info = environment.step(a)
+        s = tuple(s)
 
     success[i] = np.isclose(info['d_sim'], best_d_sim).astype(int)
 
