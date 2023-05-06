@@ -20,26 +20,26 @@ def apply_threshold(
 
     # Only use a single cut-off value
     if ti_right is None:
-        bit_mask = cv2.threshold(sample, ti_left, 255, cv2.THRESH_BINARY_INV)[1]
+        bitmask = cv2.threshold(sample, ti_left, 255, cv2.THRESH_BINARY_INV)[1]
     else:
         ti_right = int(ti_right)
-        bit_mask = cv2.inRange(sample, ti_left, ti_right)
+        bitmask = cv2.inRange(sample, ti_left, ti_right)
 
-    return bit_mask
+    return bitmask
 
 def apply_opening(
-    bit_mask: np.ndarray,
+    bitmask: np.ndarray,
     size: int
 ) -> np.ndarray:
     # Check that the structuring element has a size
     if size == 0:
-        return bit_mask
+        return bitmask
 
     # Construct the kernel, and apply an opening to the bit-mask
     kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size))
-    bit_mask = cv2.morphologyEx(bit_mask, cv2.MORPH_OPEN, kernel)
+    bitmask = cv2.morphologyEx(bitmask, cv2.MORPH_OPEN, kernel)
 
-    return bit_mask
+    return bitmask
 
 def get_intensity_spectrum(
     sample: np.ndarray,
@@ -50,14 +50,19 @@ def get_intensity_spectrum(
     return np.linspace(minimum, maximum, n_thresholds, dtype=np.uint8)
 
 def compute_dissimilarity(
-    bit_mask: np.ndarray,
+    bitmask: np.ndarray,
     label: np.ndarray
 ) -> float:
-    # return np.sum(np.logical_xor(bit_mask, label)) / label.size
     height, width = label.shape
 
-    xor = np.logical_xor(bit_mask, label)
-    summation = xor.sum()
+    xor = np.logical_xor(bitmask, label)
+    summation = np.sum(xor)
     normal = summation / (height * width)
     
     return normal.astype(float)
+
+def compute_dissimilarity_new(
+    bitmask: np.ndarray,
+    label: np.ndarray
+) -> float:
+    return (bitmask != label).sum() / label.size
