@@ -69,6 +69,9 @@ input_ranges = np.asarray([
 stepSize = 0.1 / tilings
 
 offsets = np.array([ build_offset(dims, tiles, tilings, ntl) for ntl in range(tilings) ])
+
+print(offsets)
+
 total_tiles = tilings * tiles ** dims
 
 weights = np.zeros(total_tiles)
