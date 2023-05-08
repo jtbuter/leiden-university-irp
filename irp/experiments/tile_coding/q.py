@@ -1,15 +1,15 @@
+import irp.experiments.tile_coding.tile_coding as tile_coding
 import numpy as np
 import irp.wrappers as wrappers
 
-def build_qtable(environment):
-    dims = wrappers.utils.get_dims(environment.observation_space, environment.action_space)
-    qtable = np.zeros(dims)
+def build_qtable(size):
+    qtable = np.zeros(size)
 
     return qtable
 
-def learn(environment, parameters):
+def learn(environment, parameters, iht):
     # We re-initialize the Q-table
-    qtable = build_qtable(environment)
+    qtable = build_qtable(iht.size)
 
     episodes = parameters['episodes']
     alpha = parameters['alpha']
