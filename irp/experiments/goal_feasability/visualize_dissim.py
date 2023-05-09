@@ -13,11 +13,6 @@ from irp.envs.ultrasound.ultra_sound_env import UltraSoundEnv
 import matplotlib.pyplot as plt
 import cv2
 
-def unravel_index(i, width, height, divisor):
-    x, y = (i * width) % divisor, ((i * width) // divisor) * height
-
-    return x, y
-
 for width, height in [(16, 8)]:
     print('\n', width, height)
 
@@ -61,7 +56,7 @@ for width, height in [(16, 8)]:
                         best_obj = obj
 
             # best_intensities[i * height, i * width] = best_dissim
-            x, y = unravel_index(i, width, height, 512)
+            x, y = irp.utils.unravel_index(i, width, height, 512)
             best_intensities[y:y+height, x:x+width] = best_dissim
             best_solvables[y:y+height, x:x+width] = float(best_dissim) <= 0.08
             best_comps[y:y+height, x:x+width] = best_comp

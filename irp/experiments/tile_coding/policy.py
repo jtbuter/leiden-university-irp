@@ -36,11 +36,19 @@ class TiledQTable():
         value = 0.0
 
         for tile in state:
-                value += self.qtable[tile, action]
+            try:
+                value += self.qtable[tile, action] / self.tilings
+            except Warning:
+                print(value, self.qtable[tile, action])
 
-        return value / self.tilings
+                raise Exception()
+
+        return value
 
     def update(self, state: List[int], action: int, target: float, alpha: float):
+        import warnings
+        warnings.filterwarnings('error')
+
         # estimate = 0.0
 
         # for tile in state:
@@ -52,4 +60,9 @@ class TiledQTable():
         #     self.qtable[tile, action] += alpha * error
 
         for tile in state: # TODO Deze manier weer gebruiken
-            self.qtable[tile, action] += alpha * (target - self.qtable[tile, action])
+            try:
+                self.qtable[tile, action] += alpha * (target - self.qtable[tile, action])
+            except Warning:
+                print(self.qtable[tile, action], alpha * (target - self.qtable[tile, action]))
+
+                raise Exception()
