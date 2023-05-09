@@ -5,7 +5,6 @@ import gym
 
 import irp.experiments.tile_coding.env as env
 import irp.wrappers as wrappers
-import irp.utils
 
 class TiledQTable():
     def __init__(self, environment: gym.Env, tilings: int):
@@ -42,19 +41,16 @@ class TiledQTable():
         # for tile in state: # TODO Deze manier weer gebruiken
         #     self.qtable[tile, action] += alpha * (target - self.qtable[tile, action])
 
-def target_fn(x, y):
-    return np.sin(x) + np.cos(y) + 0.1 * np.random.randn()
-
-class PiEnv():
-    def __init__(self, iht):
-        self.observation_space = gym.spaces.Discrete(n=iht.size)
-        self.action_space = gym.spaces.Discrete(n=1)
-
-def mytiles(x, y, tiles):
-    scaleFactor = 10 / (2 * np.pi)
-    return wrappers.utils.tiles(iht, tiles, [x*scaleFactor,y*scaleFactor])
 
 if __name__ == "__main__":
+    def target_fn(x, y):
+        return np.sin(x) + np.cos(y) + 0.1 * np.random.randn()
+
+    class PiEnv():
+        def __init__(self, iht):
+            self.observation_space = gym.spaces.Discrete(n=iht.size)
+            self.action_space = gym.spaces.Discrete(n=1)
+
     # Hyperparameters
     parameters = {
         'alpha': 0.1,           # Learning rate
@@ -70,26 +66,23 @@ if __name__ == "__main__":
     action = 0
 
     environment = PiEnv(iht)
+    environment = wrappers.Tiled(environment, lows=(0, 0), highs=(2 * np.pi, 2 * np.pi), tilings=tilings, iht=iht, rescale=False)
 
     error = []
     qtable = TiledQTable(environment, tilings)
-    scaleFactor = 10 / (2 * np.pi)
-
-    assert (qtable.qtable == np.zeros((iht.size, 1))).all(), "qtable not empty"
 
     for i in range(1000):
         # get noisy sample from target function at random location
         x, y = 2.0 * np.pi * np.random.rand(2)
         target = target_fn(x, y)
-        # state = environment.encode(iht, tilings, (x, y))
-        state = wrappers.utils.tiles(iht, tilings, [x * scaleFactor, y * scaleFactor])
+        state = environment.encode(iht, tilings, (x, y), rescale=False, input_limits=environment._input_limits)
         
         qtable.update(state, 0, target, alpha)
 
     x, y = 2.5, 3.1
-    state = wrappers.utils.tiles(iht, tilings, [x * scaleFactor, y * scaleFactor])
+    state = state = environment.encode(iht, tilings, (x, y), rescale=False, input_limits=environment._input_limits)
 
-    print((np.sin(x) + np.cos(y)), qtable.value(state, 0))
+    print((np.sin(x) + np.cos(y)), qtable.value(state))
 
     # import matplotlib.pyplot as plt
     # from mpl_toolkits.mplot3d import Axes3D

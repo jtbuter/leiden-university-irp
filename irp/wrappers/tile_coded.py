@@ -44,25 +44,22 @@ class Tiled(gym.Wrapper):
         iht: Union[IHT, int, None],
         tilings: int,
         state: List[float],
+        rescale: Optional[bool] = False,
+        input_limits: Optional[np.ndarray] = None
     ):
+        if rescale:
+            state = wrappers.utils.min_max_scaling(state, *input_limits)
+
         return wrappers.utils.tiles(iht, tilings, state)
 
     def step(self, action: int):
         state, reward, done, info = self.env.step(action)
-
-        if self._rescale:
-            scaled_state = wrappers.utils.min_max_scaling(state, *self._input_limits)
-
-        encoded = self.encode(self._IHT, self._tilings, scaled_state)
+        encoded = self.encode(self._IHT, self._tilings, state, self._rescale, self._input_limits)
 
         return np.asarray(encoded), reward, done, info
 
     def reset(self, **kwargs: Dict):
         state = self.env.reset(**kwargs)
-
-        if self._rescale:
-            scaled_state = wrappers.utils.min_max_scaling(state, *self._input_limits)
-
-        encoded = self.encode(self._IHT, self._tilings, scaled_state)
+        encoded = self.encode(self._IHT, self._tilings, state, self._rescale, self._input_limits)
 
         return np.asarray(encoded)

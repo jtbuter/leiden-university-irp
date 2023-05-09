@@ -27,7 +27,7 @@ if __name__ == "__main__":
     maxSize = 2048
     iht = wrappers.utils.IHT(maxSize)
     # weights = [0]*maxSize
-    numTilings = 8
+    numTilings = 16
     stepSize = 0.1/numTilings
 
     import numpy as np
@@ -37,7 +37,7 @@ if __name__ == "__main__":
         return np.sin(x) + np.cos(y) + 0.1 * np.random.randn()
 
     def mytiles(x, y):
-        scaleFactor = 1
+        scaleFactor = 10 / (2 * np.pi)
         return tiles(iht, numTilings, [x*scaleFactor,y*scaleFactor])
 
     def learn(x, y, z):
@@ -77,25 +77,25 @@ if __name__ == "__main__":
     print((np.sin(x) + np.cos(y)), test(x, y))
 
 
-    # import matplotlib.pyplot as plt
-    # from mpl_toolkits.mplot3d import Axes3D
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
 
-    # # resolution
-    # res = 200
+    # resolution
+    res = 200
 
-    # # (x, y) space to evaluate
-    # x = np.arange(0.0, 2.0 * np.pi, 2.0 * np.pi / res)
-    # y = np.arange(0.0, 2.0 * np.pi, 2.0 * np.pi / res)
+    # (x, y) space to evaluate
+    x = np.arange(0.0, 2.0 * np.pi, 2.0 * np.pi / res)
+    y = np.arange(0.0, 2.0 * np.pi, 2.0 * np.pi / res)
 
-    # # map the function across the above space
-    # z = np.zeros([len(x), len(y)])
-    # for i in range(len(x)):
-    #     for j in range(len(y)):
-    #         z[i, j] = test(x[i], y[j])
+    # map the function across the above space
+    z = np.zeros([len(x), len(y)])
+    for i in range(len(x)):
+        for j in range(len(y)):
+            z[i, j] = test(x[i], y[j])
 
-    # # plot function
-    # fig = plt.figure()
-    # ax = fig.add_subplot(projection='3d')
-    # X, Y = np.meshgrid(x, y)
-    # surf = ax.plot_surface(X, Y, z, cmap=plt.get_cmap('hot'))
-    # plt.show()
+    # plot function
+    fig = plt.figure()
+    ax = fig.add_subplot(projection='3d')
+    X, Y = np.meshgrid(x, y)
+    surf = ax.plot_surface(X, Y, z, cmap=plt.get_cmap('hot'))
+    plt.show()
