@@ -51,3 +51,7 @@ class Env(gym.Env):
         bitmask = envs.utils.apply_threshold(self.sample, th)
 
         return UltraSoundEnv.observation(bitmask)
+
+    @property
+    def d_sim(self):
+        return self._d_sim
