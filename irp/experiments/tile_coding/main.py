@@ -10,41 +10,23 @@ import irp.wrappers as wrappers
 # Hyperparameters
 parameters = {
     'learning_delay': 0,    # Delay until epsilon starts updating
-    'episodes': 500,       # Total number of episodes
+    'episodes': 500,        # Total number of episodes
     'alpha': 0.5,           # Learning rate
     'gamma': 0.9,           # Discount factor
     'epsilon': 1.0,         # Amount of randomness in the action selection
-    'epsilon_decay': 0.001  # Fixed amount to decrease
+    'epsilon_decay': 0.001, # Fixed amount to decrease
+    'tilings': 16           # Number of tilings to use
 }
 
 idx = 721
 sample, label = irp.utils.make_sample_label('case10_10.png', idx=idx)[0]
 n_thresholds = 6
 
-# Compute the best similarty we can obtain
-best_d_sim = irp.utils.get_best_dissimilarity(sample, label, n_thresholds)
-
-print('Best possible dissimilarity:', best_d_sim)
-
-bins = (5, 5, 4)
+iht = wrappers.utils.IHT(2048)
+tilings = parameters['tilings']
 
 environment = env.Env(sample, label, n_thresholds)
-environment = wrappers.Discretize(environment, (0, 0, 1), (1, 1, bins[2]), bins)
-success = np.zeros((10,))
+environment = wrappers.Tiled(environment, lows=(0, 0, 1), highs=(1, 1, 32), tilings=tilings, iht=iht)
 
-for i in range(success.size):
-    qtable, epsilons = q.learn(environment, parameters)
-
-    # Assert that we succeeded in learning
-    success[i] = True
-
-    s = tuple(environment.reset(ti=n_thresholds - 1))
-
-    for j in range(10):
-        a = np.argmax(qtable[s])
-        s, r, d, info = environment.step(a)
-        s = tuple(s)
-
-    success[i] = np.isclose(info['d_sim'], best_d_sim).astype(int)
-
-print(f'Success rate: {((success.sum() / success.size) * 100):.2f} %')
+for i in range(n_thresholds):
+    print(environment.reset(ti=i))

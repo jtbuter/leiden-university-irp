@@ -1,15 +1,15 @@
-import irp.experiments.tile_coding.tile_coding as tile_coding
 import numpy as np
 import irp.wrappers as wrappers
 
-def build_qtable(size):
-    qtable = np.zeros(size)
+def build_qtable(environment):
+    dims = wrappers.utils.get_dims(environment.observation_space, environment.action_space)
+    qtable = np.zeros(dims)
 
     return qtable
 
-def learn(environment, parameters, iht):
+def learn(environment, parameters):
     # We re-initialize the Q-table
-    qtable = build_qtable(iht.size)
+    qtable = build_qtable(environment)
 
     episodes = parameters['episodes']
     alpha = parameters['alpha']
@@ -17,6 +17,9 @@ def learn(environment, parameters, iht):
     epsilon = parameters['epsilon']
     epsilon_decay = parameters['epsilon_decay']
     learning_delay = parameters['learning_delay']
+    tilings = parameters['tilings']
+
+    alpha /= tilings
 
     # List of outcomes to plot
     outcomes = []

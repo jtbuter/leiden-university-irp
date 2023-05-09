@@ -12,5 +12,7 @@ class ExpandDims(gym.Wrapper):
 
         return np.array([obs]), reward, terminated, info
 
-    def reset(self):
-        return np.array([self.env.reset()])
+    def reset(self, **kwargs):
+        state = self.env.reset(**kwargs)
+
+        return np.array([state])
