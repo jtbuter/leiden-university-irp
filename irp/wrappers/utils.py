@@ -94,5 +94,6 @@ def tiles(
     return tiles_
 
 def min_max_scaling(x, mi, ma):
-    return (x - mi) * (10.0 / (ma - mi))
+    # Assumes we're working with Sutton tile-coding (i.e. division of 10.0)
+    return np.clip((x - mi) * (10.0 / (ma - mi)), 0, 10.0)
 

@@ -1,33 +1,37 @@
+from typing import Dict, Optional
 import numpy as np
+
+import os
+import irp
 import irp.wrappers as wrappers
+import irp.q
+from irp.experiments.tile_coding.policy import TiledQTable
 
-def build_qtable(environment):
-    dims = wrappers.utils.get_dims(environment.observation_space, environment.action_space)
-    qtable = np.zeros(dims)
-
-    return qtable
-
-def learn(environment, parameters):
-    # We re-initialize the Q-table
-    qtable = build_qtable(environment)
+def learn(environment, parameters: Dict, log: Optional[bool] = False):
+    if log:
+        model = irp.q.Q(environment, 0.0, tensorboard_log=os.path.join(irp.ROOT_DIR, 'results/tile_coding'))
+        model.learn(0)
 
     episodes = parameters['episodes']
     alpha = parameters['alpha']
     gamma = parameters['gamma']
     epsilon = parameters['epsilon']
     epsilon_decay = parameters['epsilon_decay']
+    min_epsilon = parameters['min_epsilon']
     learning_delay = parameters['learning_delay']
     tilings = parameters['tilings']
 
-    alpha /= tilings
+    # We re-initialize the Q-table
+    qtable = TiledQTable(environment, tilings, parameters['hash_size'])
+    # alpha /= tilings # TODO: Checken of het beter werkt als we / tilings weghalen in policy.py
 
     # List of outcomes to plot
     outcomes = []
-    epsilons = []
+    d_sims = []
 
     # Training
     for e in range(episodes):
-        state = tuple(environment.reset())
+        state = environment.reset()
         done = False
 
         # By default, we consider our outcome to be a failure
@@ -43,15 +47,23 @@ def learn(environment, parameters):
                 action = environment.action_space.sample()
             # Else, take the action with the highest value in the current state
             else:
-                action = np.argmax(qtable[state])
+                qs = qtable.qs(state)
+
+                action = np.argmax(qs)
 
             # Implement this action and move the agent in the desired direction
             new_state, reward, done, info = environment.step(action)
-            new_state = tuple(new_state)
+
+            d_sims.append(info['d_sim'])
+
+            # Compute the target
+            qs = qtable.qs(new_state)
+            target = reward + gamma * max(qs)
 
             # Update Q(s,a)
-            qtable[state][action] = qtable[state][action] + \
-                                    alpha * (reward + gamma * np.max(qtable[new_state]) - qtable[state][action])
+            qtable.update(state, action, target, alpha)
+            # qtable[state][action] = qtable[state][action] + \
+            #                         alpha * (reward + gamma * np.max(qtable[new_state]) - qtable[state][action])
             
             # Update our current state
             state = new_state
@@ -60,10 +72,11 @@ def learn(environment, parameters):
             if reward:
                 outcomes[-1] = "Success"
 
+        if e % 50 == 0 and e > 0 and log:
+            model._tb_write('rollout//dissim', np.mean(d_sims[-100:]), e)
+
         if e >= learning_delay:
             # Update epsilon
-            epsilon = max(epsilon - epsilon_decay, 0)
+            epsilon = max(epsilon - epsilon_decay, min_epsilon)
 
-        epsilons.append(epsilon)
-
-    return qtable, epsilons
+    return qtable

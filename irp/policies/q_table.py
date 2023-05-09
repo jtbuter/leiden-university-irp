@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional, Tuple, Type, TypeVar, Union
 from stable_baselines3.common.policies import BasePolicy
 
 import irp.utils
+import irp.wrappers as wrappers
 
 import numpy as np
 
@@ -14,7 +15,10 @@ class QPolicy(BasePolicy):
         self._build()
 
     def _build(self):
-        dims = irp.utils.get_dims(self.observation_space, self.action_space)
+        dims = wrappers.utils.get_dims(self.observation_space, self.action_space)
+
+        if len(dims) > 32:
+            dims = (1,) * 32
 
         self.q_table = np.zeros(dims)
 

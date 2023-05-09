@@ -24,9 +24,9 @@ class Tiled(gym.Wrapper):
         if iht is None:
             self._observation_space = wrappers.utils.get_dims(env.observation_space) + (1,)
         elif isinstance(iht, wrappers.utils.IHT):
-            self._observation_space = gym.spaces.Discrete(n=iht.size)
+            self._observation_space = gym.spaces.MultiDiscrete(nvec=(1,) * tilings)
         elif isinstance(iht, int):
-            self._observation_space = gym.spaces.Discrete(n=iht)
+            self._observation_space = gym.spaces.Discrete(nvec=(1,) * tilings)
 
         self._action_space = env.action_space
         self._IHT = iht

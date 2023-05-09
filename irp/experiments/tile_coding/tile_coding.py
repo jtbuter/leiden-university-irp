@@ -28,7 +28,7 @@ if __name__ == "__main__":
     iht = wrappers.utils.IHT(maxSize)
     # weights = [0]*maxSize
     numTilings = 16
-    stepSize = 0.1/numTilings
+    stepSize = 0.1 / numTilings
 
     import numpy as np
 
