@@ -17,7 +17,7 @@ class Env(gym.Env):
         self.action_space = gym.spaces.Discrete(n=len(self.action_mapping))
 
         self._intensity_spectrum = envs.utils.get_intensity_spectrum(sample, n_thresholds)
-        self._intensity_spectrum = np.insert(self._intensity_spectrum, 0, 0.0)
+        self._intensity_spectrum = np.insert(self._intensity_spectrum, 0, -1.0)
         
         self.n_thresholds = n_thresholds + 1
 
@@ -29,10 +29,10 @@ class Env(gym.Env):
         th = self._intensity_spectrum[self.ti]
 
         # Compute the new bitmask
-        bitmask = envs.utils.apply_threshold(self.sample, th)
+        self.bitmask = envs.utils.apply_threshold(self.sample, th)
 
         # Update the dissimilarity metric
-        d_sim = envs.utils.compute_dissimilarity(bitmask, self.label)
+        d_sim = envs.utils.compute_dissimilarity(self.bitmask, self.label)
 
         # We're done if we at least match the previous best dissimilarity
         done = d_sim <= self._d_sim
@@ -43,7 +43,7 @@ class Env(gym.Env):
         else:
             reward = 0
 
-        return UltraSoundEnv.observation(bitmask), reward, done, {'d_sim': d_sim}
+        return UltraSoundEnv.observation(self.bitmask), reward, done, {'d_sim': d_sim}
 
     def reset(self, ti: Optional[int] = None):
         # Pick random threshold intensity, or use the one specified by the user
@@ -51,9 +51,9 @@ class Env(gym.Env):
         th = self._intensity_spectrum[self.ti]
 
         # Compute the bitmask
-        bitmask = envs.utils.apply_threshold(self.sample, th)
+        self.bitmask = envs.utils.apply_threshold(self.sample, th)
 
-        return UltraSoundEnv.observation(bitmask)
+        return UltraSoundEnv.observation(self.bitmask)
 
     @property
     def d_sim(self):

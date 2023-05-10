@@ -1,3 +1,6 @@
+import irp
+import json
+import os
 import gym
 import irp.experiments.tile_coding.q as q
 import irp.experiments.tile_coding.env as env
@@ -9,77 +12,109 @@ import matplotlib.pyplot as plt
 import irp.wrappers as wrappers
 import gym.wrappers
 import irp.q
+from sklearn.model_selection import ParameterGrid
 
 if __name__ == "__main__":
-    train_name = 'case10_10.png'
-    subimage_width, subimage_height = 16, 8
-    overlap = 0.875
-    shape = (512, 512)
-    n_size = 2
+    grid = ParameterGrid({
+        'n_thresholds': [3],
+        'overlap': [0.75],
+        'n_size': [1],
+        'tilings': [16]
+    })
 
-    # Hyperparameters
-    parameters = {
-        'learning_delay': 250,  # Delay until epsilon starts updating
-        'episodes': 5000,       # Total number of episodes
-        'alpha': 0.6,           # Learning rate
-        'gamma': 0.9,           # Discount factor
-        'epsilon': 1.0,         # Amount of randomness in the action selection
-        'epsilon_decay': 0.001, # Fixed amount to decrease
-        'tilings': 16,          # Number of tilings to use
-        'n_thresholds': 3,
-        'hash_size': 2**12,
-        'min_epsilon': 0.05
-    }
+    results = {}
 
-    tilings = parameters['tilings']
-    n_thresholds = parameters['n_thresholds']
-    iht = wrappers.utils.IHT(parameters['hash_size'])
-    
-    # coord = (304, 288)
-    # coord = (304, 288)
-    coord = (336, 248)
-    idx = irp.utils.coord_to_id(coord, shape, subimage_width, subimage_height, overlap)
+    for param in grid:
+        print(param)
 
-    # Get all the training subimages
-    subimages, sublabels = np.asarray(
-        irp.utils.make_sample_label(train_name, width=subimage_width, height=subimage_height, overlap=overlap, idx=None)
-    )[0]
+        results[str(param)] = {}
 
-    # Get the subimages in the neighborhood of the image we're analyzing
-    n_subimages, n_sublabels = irp.utils.get_neighborhood_images(
-        subimages, sublabels, coord, shape, subimage_width, subimage_height, overlap, n_size
-    )
+        train_name = 'case10_10.png'
+        subimage_width, subimage_height = 16, 8
+        overlap = param['overlap']
+        shape = (512, 512)
+        n_size = param['n_size']
 
-    # # Create a MultiSample environment to train on multiple subimages
-    environments = wrappers.MultiSample([])
+        # Hyperparameters
+        parameters = {
+            'learning_delay': 500,  # Delay until epsilon starts updating
+            'episodes': 2000,       # Total number of episodes
+            'alpha': 0.6,           # Learning rate
+            'gamma': 0.9,           # Discount factor
+            'epsilon': 1.0,         # Amount of randomness in the action selection
+            'epsilon_decay': 0.001, # Fixed amount to decrease
+            'tilings': 16,          # Number of tilings to use
+            'n_thresholds': 5,
+            'hash_size': 2**12,
+            'min_epsilon': 0.05
+        }
 
-    for subimage, sublabel in zip(n_subimages, n_sublabels):
-        environment = env.Env(subimage, sublabel, n_thresholds)
-        environment = gym.wrappers.TimeLimit(environment, 30) # TODO: Kunnen we deze weghalen uiteindelijk
-        environment = wrappers.Tiled(environment, lows=(0, 0, 1), highs=(1, 1, 32), tilings=tilings, iht=iht, rescale=True)
+        tilings = param['tilings']
+        n_thresholds = param['n_thresholds']
 
-        environments.add(environment)
+        coords = [(192, 176), (256, 232), (304, 288), (336, 248), (272, 176)]
+        coords = [(256, 224)]
 
-    qtable = q.learn(environments, parameters, log=True)
+        for coord in coords:
+            solved = []
+        
+            for xy in range(3):
+                solved.append(0)
+            
+                iht = wrappers.utils.IHT(parameters['hash_size'])
+                idx = irp.utils.coord_to_id(coord, shape, subimage_width, subimage_height, overlap)
 
-    # Define the test filename and get all the subimages
-    test_name = 'case10_11.png'
-    subimage, sublabel = np.asarray(
-        irp.utils.make_sample_label(test_name, width=subimage_width, height=subimage_height, overlap=overlap, idx=idx)
-    )[0]
+                # Get all the training subimages
+                subimages, sublabels = np.asarray(
+                    irp.utils.make_sample_label(train_name, width=subimage_width, height=subimage_height, overlap=overlap, idx=None)
+                )[0]
 
-    environment = env.Env(subimage, sublabel, n_thresholds)
-    environment = gym.wrappers.TimeLimit(environment, 30) # TODO: Kunnen we deze weghalen uiteindelijk
-    environment = wrappers.Tiled(environment, lows=(0, 0, 1), highs=(1, 1, 4), tilings=tilings, iht=iht, rescale=True)
+                # Get the subimages in the neighborhood of the image we're analyzing
+                n_subimages, n_sublabels = irp.utils.get_neighborhood_images(
+                    subimages, sublabels, coord, shape, subimage_width, subimage_height, overlap, n_size
+                )
 
-    print("Best obtainable dissimilarity:", environment.d_sim)
+                # # Create a MultiSample environment to train on multiple subimages
+                environments = wrappers.MultiSample([])
 
-    s = environment.reset(ti=0)
+                for subimage, sublabel in zip(n_subimages, n_sublabels):
+                    environment = env.Env(subimage, sublabel, n_thresholds)
+                    environment = gym.wrappers.TimeLimit(environment, 30) # TODO: Kunnen we deze weghalen uiteindelijk
+                    environment = wrappers.Tiled(environment, lows=(0, 0, 0), highs=(1, 1, 32), tilings=tilings, iht=iht, rescale=True)
 
-    print(qtable.qs(s))
+                    environments.add(environment)
 
-    for j in range(10):
-        a = np.argmax(qtable.qs(s))
-        s, r, d, info = environment.step(a)
+                qtable = q.learn(environments, parameters, log=True)
 
-        print(info['d_sim'])
+                # Define the test filename and get all the subimages
+                test_name = 'case10_11.png'
+                subimage, sublabel = np.asarray(
+                    irp.utils.make_sample_label(test_name, width=subimage_width, height=subimage_height, overlap=overlap, idx=idx)
+                )[0]
+
+                environment = env.Env(subimage, sublabel, n_thresholds)
+                environment = gym.wrappers.TimeLimit(environment, 30) # TODO: Kunnen we deze weghalen uiteindelijk
+                environment = wrappers.Tiled(environment, lows=(0, 0, 0), highs=(1, 1, 32), tilings=tilings, iht=iht, rescale=True)
+
+                # print("Best obtainable dissimilarity:", environment.d_sim)
+
+                s = environment.reset(ti=environment.n_thresholds - 1)
+
+                for j in range(environment.n_thresholds + 2):
+                    a = np.argmax(qtable.qs(s))
+                    s, r, d, info = environment.step(a)
+
+                    # print(info['d_sim'])
+
+                print(environment.ti)
+                irp.utils.show(environment.bitmask)
+
+                if np.isclose(info['d_sim'], environment.d_sim):
+                    solved[-1] = 1
+
+            results[str(param)][str(coord)] = solved
+
+            print(coord, solved)
+
+            # with open(os.path.join(irp.ROOT_DIR, 'results/tile_coding', 'data.json'), 'w') as f:
+            #     json.dump(results, f, ensure_ascii=False, indent=4)

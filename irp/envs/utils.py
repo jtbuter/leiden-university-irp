@@ -18,6 +18,10 @@ def apply_threshold(
 ) -> np.ndarray:
     ti_left = int(ti_left)
 
+    # We can't make this threshold using opencv
+    if ti_left < 0:
+        return np.zeros_like(sample)
+
     # Only use a single cut-off value
     if ti_right is None:
         bitmask = cv2.threshold(sample, ti_left, 255, cv2.THRESH_BINARY_INV)[1]
@@ -44,10 +48,10 @@ def apply_opening(
 def get_intensity_spectrum(
     sample: np.ndarray,
     n_thresholds: int
-) -> List[int]:
+) -> np.ndarray:
     minimum, maximum = np.min(sample), np.max(sample)
 
-    return np.linspace(minimum, maximum, n_thresholds, dtype=np.uint8)
+    return np.linspace(minimum, maximum, n_thresholds)
 
 def compute_dissimilarity(
     bitmask: np.ndarray,
