@@ -15,6 +15,7 @@ from gym.wrappers import TimeLimit
 from scipy.ndimage import median_filter
 
 import irp.wrappers.discretize
+import irp.envs as envs
 
 if typing.TYPE_CHECKING:
     from irp.q import Q
@@ -348,22 +349,37 @@ def get_neighborhood_images(
     
     return np.asarray([subimages[i] for i in neighborhood_ids]), np.asarray([sublabels[i] for i in neighborhood_ids])
 
-def get_best_dissimilarity(subimage, sublabel, n_thresholds):
-    mini, maxi = np.min(subimage), np.max(subimage)
-    left_bound = np.asarray(max(0, mini - 1), dtype=np.uint8)
-
-    tis = np.concatenate(([left_bound], np.linspace(mini, maxi, n_thresholds, dtype=np.uint8))).tolist()
+def get_best_dissimilarity(subimage, sublabel, tis, return_ti = False):
     best_dissim = np.inf
+    best_ti = -1
 
     for ti in tis:
-        bitmask = irp.envs.utils.apply_threshold(subimage, ti)
-        dissim = irp.envs.utils.compute_dissimilarity(bitmask, sublabel)
+        ti = int(ti)
+
+        bitmask = envs.utils.apply_threshold(subimage, ti)
+        dissim = envs.utils.compute_dissimilarity(bitmask, sublabel)
 
         if dissim < best_dissim:
             best_dissim = dissim
+            best_ti = ti
+
+    if return_ti:
+        return float(best_dissim), best_ti
 
     return float(best_dissim)
 
 def show(sample):
     plt.imshow(sample, vmin=0, vmax=255, cmap='gray')
     plt.show()
+
+def area_of_overlap(
+    label: np.ndarray,
+    bitmask: np.ndarray
+) -> float:
+    tp = ((label == 255) & (bitmask == 255)).sum()
+    fn = ((bitmask == 0) & (label != bitmask)).sum()
+
+    if tp + fn == 0:
+        return 0.0
+
+    return tp / (tp + fn)

@@ -9,14 +9,21 @@ class MultiSample(gym.Wrapper):
         # No environments were actually passed yet
         if len(envs) > 0:
             super().__init__(envs[0])
-
+        
+        self._order = None
         self._envs = envs
+        self._env_id = 0
 
     def reset(self, **kwargs):
-        # self._env_id = np.random.randint(len(self._envs))
-        # self._env_id = math.floor(random.random() * len(self._envs))
-        self._env_id = random.randrange(0, len(self._envs))
-        self.env = self._envs[self._env_id]
+        envs = self._envs
+
+        if self._order is None:
+            self._order = np.random.choice(range(len(envs)), len(envs), replace=False)
+
+        # self._env_id = np.random.randint(len(envs))
+        self._env_id = math.floor(random.random() * len(envs))
+        # self._env_id = (self._env_id + 1) % len(envs)
+        self.env = envs[self._env_id]
 
         return super().reset(**kwargs)
 

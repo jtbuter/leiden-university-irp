@@ -2,7 +2,7 @@ import cProfile
 from irp.experiments.goal_feasability.env import Env
 import irp.experiments.goal_feasability.q as q
 import irp.utils
-import irp.envs
+import irp.envs as envs
 import irp
 import numpy as np
 from irp.wrappers import Discretize, MultiSample
@@ -53,7 +53,10 @@ for coord in coords:
 
     # For now, only use subimage that actually contain a goal-state
     for subimage, sublabel in zip(n_subimages, n_sublabels):
-        solvable = irp.utils.get_best_dissimilarity(subimage, sublabel, n_thresholds) <= delta
+        intensities = envs.utils.get_intensity_spectrum(subimage, n_thresholds)
+        intensities = np.insert(intensities, 0, 0.0)
+        
+        solvable = irp.utils.get_best_dissimilarity(subimage, sublabel, intensities) <= delta
 
         if solvable:
             train_Xy.append((subimage, sublabel))

@@ -26,7 +26,7 @@ if __name__ == "__main__":
         'epsilon': 1.0,         # Amount of randomness in the action selection
         'epsilon_decay': 0.001, # Fixed amount to decrease
         'tilings': 16,          # Number of tilings to use
-        'n_thresholds': 3,
+        'n_thresholds': 4,
         'hash_size': 2**12,
         'min_epsilon': 0.05
     }
@@ -35,9 +35,10 @@ if __name__ == "__main__":
     n_thresholds = parameters['n_thresholds']
     iht = wrappers.utils.IHT(parameters['hash_size'])
     
-    # coord = (304, 288)
-    # coord = (304, 288)
-    coord = (336, 248)
+    coord = (272, 176)
+    coord = (304, 288)
+    # coord = (336, 248)
+    # coord = (320, 200)
     idx = irp.utils.coord_to_id(coord, shape, subimage_width, subimage_height, overlap)
 
     # Get all the training subimages
@@ -50,17 +51,17 @@ if __name__ == "__main__":
         subimages, sublabels, coord, shape, subimage_width, subimage_height, overlap, n_size
     )
 
-    # # Create a MultiSample environment to train on multiple subimages
-    environments = wrappers.MultiSample([])
+    states = set()
 
+    # Collect train states
     for subimage, sublabel in zip(n_subimages, n_sublabels):
         environment = env.Env(subimage, sublabel, n_thresholds)
-        environment = gym.wrappers.TimeLimit(environment, 30) # TODO: Kunnen we deze weghalen uiteindelijk
-        environment = wrappers.Tiled(environment, lows=(0, 0, 1), highs=(1, 1, 32), tilings=tilings, iht=iht, rescale=True)
+        environment = wrappers.Tiled(environment, lows=(0, 0, 0), highs=(1, 1, 32), tilings=tilings, iht=iht, rescale=True)
 
-        environments.add(environment)
+        for i in range(environment.n_thresholds):
+            state = environment.reset(ti=i)
 
-    qtable = q.learn(environments, parameters, log=True)
+            states.add(tuple(state.tolist()))
 
     # Define the test filename and get all the subimages
     test_name = 'case10_11.png'
@@ -69,17 +70,30 @@ if __name__ == "__main__":
     )[0]
 
     environment = env.Env(subimage, sublabel, n_thresholds)
-    environment = gym.wrappers.TimeLimit(environment, 30) # TODO: Kunnen we deze weghalen uiteindelijk
-    environment = wrappers.Tiled(environment, lows=(0, 0, 1), highs=(1, 1, 4), tilings=tilings, iht=iht, rescale=True)
+    environment = wrappers.Tiled(environment, lows=(0, 0, 0), highs=(1, 1, 32), tilings=tilings, iht=iht, rescale=True)
 
-    print("Best obtainable dissimilarity:", environment.d_sim)
+    best_d_sim, ti = irp.utils.get_best_dissimilarity(subimage, sublabel, environment.intensity_spectrum, return_ti=True)
 
-    s = environment.reset(ti=0)
+    print("Best obtainable d-sim:", best_d_sim)
 
-    print(qtable.qs(s))
+    irp.utils.show(np.hstack([sublabel, envs.utils.apply_threshold(subimage, ti)]))
 
-    for j in range(10):
-        a = np.argmax(qtable.qs(s))
-        s, r, d, info = environment.step(a)
+    states_ = set()
 
-        print(info['d_sim'])
+    for i in range(environment.n_thresholds):
+        state = environment.reset(ti=i)
+
+        states_.add(tuple(state.tolist()))
+
+    flat_states = set(np.asarray(list(states)).flatten().tolist())
+
+    print(len(flat_states))
+
+    flat_states_ = set(np.asarray(list(states_)).flatten().tolist())
+
+    print(len(flat_states_))
+
+    print(len(flat_states & flat_states_) / len(flat_states_))
+
+    # print(len(states), len(states_))
+    # [print(state) for state in states]

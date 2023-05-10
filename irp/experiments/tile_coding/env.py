@@ -13,12 +13,15 @@ class Env(gym.Env):
     def __init__(self, sample: np.ndarray, label: np.ndarray, n_thresholds: int):
         self.sample = sample
         self.label = label
-        self.n_thresholds = n_thresholds
 
         self.action_space = gym.spaces.Discrete(n=len(self.action_mapping))
 
         self._intensity_spectrum = envs.utils.get_intensity_spectrum(sample, n_thresholds)
-        self._d_sim = irp.utils.get_best_dissimilarity(sample, label, n_thresholds)
+        self._intensity_spectrum = np.insert(self._intensity_spectrum, 0, 0.0)
+        
+        self.n_thresholds = n_thresholds + 1
+
+        self._d_sim = irp.utils.get_best_dissimilarity(sample, label, self._intensity_spectrum)
 
     def step(self, action: int):
         # Update the threshold index
@@ -55,3 +58,7 @@ class Env(gym.Env):
     @property
     def d_sim(self):
         return self._d_sim
+
+    @property
+    def intensity_spectrum(self):
+        return self._intensity_spectrum
