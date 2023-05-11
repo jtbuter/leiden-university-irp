@@ -5,7 +5,7 @@ import numpy as np
 import irp.envs as envs
 import irp.utils
 from irp.envs.ultrasound.ultra_sound_env import UltraSoundEnv
-
+ 
 class Env(gym.Env):
     # Defines how thresholds can be modified
     action_mapping = [1, 0, -1]
