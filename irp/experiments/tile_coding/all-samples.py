@@ -20,20 +20,20 @@ test_name =  'case10_11.png'
 real_label = irp.utils.read_image(os.path.join(irp.GIT_DIR, '../data/trus/labels/', test_name))
 
 subimage_width, subimage_height = 16, 8
-overlap = 0.75
+overlap = 0.875
 shape = (512, 512)
-n_size = 1
+n_size = 2
 
 # Hyperparameters
 parameters = {
     'learning_delay': 500,  # Delay until epsilon starts updating
-    'episodes': 2000,       # Total number of episodes
+    'episodes': 3000,       # Total number of episodes
     'alpha': 0.6,           # Learning rate
     'gamma': 0.9,           # Discount factor
     'epsilon': 1.0,         # Amount of randomness in the action selection
     'epsilon_decay': 0.001, # Fixed amount to decrease
     'tilings': 16,          # Number of tilings to use
-    'n_thresholds': 3,
+    'n_thresholds': 5,
     'hash_size': 2**12,
     'min_epsilon': 0.05
 }

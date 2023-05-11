@@ -16,11 +16,20 @@ from sklearn.model_selection import ParameterGrid
 
 if __name__ == "__main__":
     grid = ParameterGrid({
-        'n_thresholds': [3],
-        'overlap': [0.75],
-        'n_size': [1],
+        'n_thresholds': [3, 4, 5, 6, 7],
+        'overlap': [0.5, 0.75, 0.875],
+        'n_size': [1, 2],
         'tilings': [16]
     })
+
+    grid = [
+        # {'n_size': 1, 'n_thresholds': 3, 'overlap': 0.5, 'tilings': 16},
+        # {'n_size': 1, 'n_thresholds': 3, 'overlap': 0.75, 'tilings': 16},
+        # {'n_size': 1, 'n_thresholds': 3, 'overlap': 0.875, 'tilings': 16},
+        {'n_size': 2, 'n_thresholds': 4, 'overlap': 0.875, 'tilings': 16},
+        # {'n_size': 1, 'n_thresholds': 5, 'overlap': 0.75, 'tilings': 16},
+        # {'n_size': 2, 'n_thresholds': 3, 'overlap': 0.875, 'tilings': 16}
+    ]
 
     results = {}
 
@@ -38,9 +47,9 @@ if __name__ == "__main__":
         # Hyperparameters
         parameters = {
             'learning_delay': 500,  # Delay until epsilon starts updating
-            'episodes': 2000,       # Total number of episodes
+            'episodes': 5000,       # Total number of episodes
             'alpha': 0.6,           # Learning rate
-            'gamma': 0.9,           # Discount factor
+            'gamma': 0.95,           # Discount factor
             'epsilon': 1.0,         # Amount of randomness in the action selection
             'epsilon_decay': 0.001, # Fixed amount to decrease
             'tilings': 16,          # Number of tilings to use
@@ -52,8 +61,9 @@ if __name__ == "__main__":
         tilings = param['tilings']
         n_thresholds = param['n_thresholds']
 
-        coords = [(192, 176), (256, 232), (304, 288), (336, 248), (272, 176)]
-        coords = [(256, 224)]
+        # coords = [(192, 176), (256, 232), (304, 288), (336, 248), (272, 176)]
+        coords = [(192, 176), (304, 288), (336, 248), (272, 176)]
+        # coords = [(336, 248)]
 
         for coord in coords:
             solved = []
@@ -77,14 +87,13 @@ if __name__ == "__main__":
                 # # Create a MultiSample environment to train on multiple subimages
                 environments = wrappers.MultiSample([])
 
-                for subimage, sublabel in zip(n_subimages, n_sublabels):
+                for environment_id, (subimage, sublabel) in enumerate(zip(n_subimages, n_sublabels)):
                     environment = env.Env(subimage, sublabel, n_thresholds)
-                    environment = gym.wrappers.TimeLimit(environment, 30) # TODO: Kunnen we deze weghalen uiteindelijk
                     environment = wrappers.Tiled(environment, lows=(0, 0, 0), highs=(1, 1, 32), tilings=tilings, iht=iht, rescale=True)
 
                     environments.add(environment)
 
-                qtable = q.learn(environments, parameters, log=True)
+                qtable = q.learn(environments, parameters, log='run_' + str(param))
 
                 # Define the test filename and get all the subimages
                 test_name = 'case10_11.png'
@@ -93,10 +102,9 @@ if __name__ == "__main__":
                 )[0]
 
                 environment = env.Env(subimage, sublabel, n_thresholds)
-                environment = gym.wrappers.TimeLimit(environment, 30) # TODO: Kunnen we deze weghalen uiteindelijk
                 environment = wrappers.Tiled(environment, lows=(0, 0, 0), highs=(1, 1, 32), tilings=tilings, iht=iht, rescale=True)
 
-                # print("Best obtainable dissimilarity:", environment.d_sim)
+                print("Best obtainable dissimilarity:", environment.d_sim)
 
                 s = environment.reset(ti=environment.n_thresholds - 1)
 
@@ -104,10 +112,9 @@ if __name__ == "__main__":
                     a = np.argmax(qtable.qs(s))
                     s, r, d, info = environment.step(a)
 
-                    # print(info['d_sim'])
+                    print(info['d_sim'])
 
-                print(environment.ti)
-                irp.utils.show(environment.bitmask)
+                # irp.utils.show(environment.bitmask)
 
                 if np.isclose(info['d_sim'], environment.d_sim):
                     solved[-1] = 1
@@ -116,5 +123,5 @@ if __name__ == "__main__":
 
             print(coord, solved)
 
-            # with open(os.path.join(irp.ROOT_DIR, 'results/tile_coding', 'data.json'), 'w') as f:
-            #     json.dump(results, f, ensure_ascii=False, indent=4)
+            with open(os.path.join(irp.ROOT_DIR, 'results/tile_coding', 'data-mo.json'), 'w') as f:
+                json.dump(results, f, ensure_ascii=False, indent=4)

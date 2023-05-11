@@ -7,10 +7,10 @@ import irp.wrappers as wrappers
 import irp.q
 from irp.experiments.tile_coding.policy import TiledQTable
 
-def learn(environment, parameters: Dict, log: Optional[bool] = False):
-    if log:
+def learn(environment, parameters: Dict, log: Optional[bool] = None):
+    if log is not None:
         model = irp.q.Q(environment, 0.0, tensorboard_log=os.path.join(irp.ROOT_DIR, 'results/tile_coding'))
-        model.learn(0)
+        model.learn(0, tb_log_name=log)
 
     episodes = parameters['episodes']
     alpha = parameters['alpha']
@@ -77,7 +77,7 @@ def learn(environment, parameters: Dict, log: Optional[bool] = False):
                 outcomes[-1] = 1
                 steps.append(step)
 
-        if e % 50 == 0 and e > 0 and log:
+        if e % 50 == 0 and e > 0 and log is not None:
             model._tb_write('rollout//dissim', np.mean(outcomes[-50:]), e)
             model._tb_write('rollout//ep_len', np.mean(steps[-50:]), e)
 

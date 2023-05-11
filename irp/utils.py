@@ -349,26 +349,35 @@ def get_neighborhood_images(
     
     return np.asarray([subimages[i] for i in neighborhood_ids]), np.asarray([sublabels[i] for i in neighborhood_ids])
 
-def get_best_dissimilarity(subimage, sublabel, tis, return_ti = False):
+def get_best_dissimilarity(subimage, sublabel, ths = [], mos = [0], return_ti = False):
     best_dissim = np.inf
-    best_ti = -1
+    best_th = -1
+    best_mo = -1
 
-    for ti in tis:
-        ti = int(ti)
+    for th in ths:
+        th = int(th)
 
-        bitmask = envs.utils.apply_threshold(subimage, ti)
-        dissim = envs.utils.compute_dissimilarity(bitmask, sublabel)
+        for mo in mos:
+            bitmask = envs.utils.apply_threshold(subimage, th)
+            bitmask = envs.utils.apply_opening(bitmask, mo)
+            dissim = envs.utils.compute_dissimilarity(bitmask, sublabel)
 
-        if dissim < best_dissim:
-            best_dissim = dissim
-            best_ti = ti
+            if dissim <= best_dissim:
+                best_dissim = dissim
+                best_th = th
+                best_mo = mo
 
-    if return_ti:
-        return float(best_dissim), best_ti
+    if return_ti and len(mos) > 1:
+        return float(best_dissim), best_th, best_mo
+    elif return_ti:
+        return float(best_dissim), best_th
 
     return float(best_dissim)
 
-def show(sample):
+def show(sample, *samples):
+    if len(samples) > 0:
+        sample = np.hstack([sample, *samples])
+
     plt.imshow(sample, vmin=0, vmax=255, cmap='gray')
     plt.show()
 
