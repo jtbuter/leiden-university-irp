@@ -31,6 +31,27 @@ def getTileIndex(dimensions: int, tiles_per_dim: int, coords: List[float]) -> in
 
     return ind
 
+def getTilingsIndices(dimensions: int, tiles: int, tilings: int, coords: List[float]) -> List[int]:
+    tiles_per_tiling = tiles**dimensions
+    tile_length = 1 / tiles
+
+    indices = np.empty(tilings)
+
+    for tiling_nb in range(tilings):
+        offset = tile_length * tiling_nb / tilings
+        offset = 0
+
+        # because this wraps around when the inputs are
+        # bigger than 1, this is a safe operation
+        # ind = getTileIndex(dimensions, tiles, coords + offset)
+        ind = getTileIndex(dimensions, tiles, coords)
+
+        # store the index, but first offset it by the number
+        # of tiles in all tilings before us
+        indices[tiling_nb] = ind + tiles_per_tiling * tiling_nb
+
+    return indices
+
 def getTilingIndex(bound: str, dims: int, tiles_per_dim: int, pos):
     ind = 0
     total_tiles = tiles_per_dim ** dims
@@ -44,10 +65,11 @@ def getTilingIndex(bound: str, dims: int, tiles_per_dim: int, pos):
     # ensure we don't overflow into another tiling
     return clip(ind, 0, total_tiles - 1)
 
-def getTCIndices(dims: int, tiles: int, tilings: int, bound: str, offsets, pos, action: Optional[int] = None):
+def getTCIndices(dims: int, tiles: int, tilings: int, bound: str, offsets: np.ndarray, pos: np.ndarray, action: Optional[int] = None):
     total_tiles = tiles**dims
 
     index = np.empty((tilings), dtype='int64')
+
     for ntl in range(tilings):
         ind = getTilingIndex(bound, dims, tiles, pos + offsets[ntl])
         index[ntl] = ind + total_tiles * ntl
@@ -71,59 +93,99 @@ def create_tiling_grid(low, high, bins=(2, 2), offsets=(0.0, 0.0)):
 def discretize(sample, grid):
     return tuple(int(np.digitize(s, g)) for s, g in zip(sample, grid))  # apply along each dimension
 
-
 def tile_encode(sample, tiles_per_dim, tilings, flatten=False):
-    index = 0
+    tilings = [discretize(sample, grid) for grid in tilings]
+    print(tilings)
+    indices = coordinates_to_index(tilings, tiles_per_dim)
 
-    for ntl, grid in enumerate(tilings):
-        encoded_sample = discretize(sample, grid)
+    return indices
+
+def coordinates_to_index(coordinates, tiles_per_dim):
+    indices = []
+    dims = len(coordinates[0])
+
+    for ntl, coordinate in enumerate(coordinates):
+        total_tiles = tiles_per_dim ** dims
+
         tiling_index = 0
 
-        for dim, coord in enumerate(encoded_sample):
+        for dim, coord in enumerate(coordinate):
             tiling_index += coord * tiles_per_dim ** dim
 
-        index += tiling_index + ntl * (len(tilings) ** len(sample))
+        indices.append(tiling_index + total_tiles * ntl)
 
-    return index
+    return indices
 
 tile_index_vals = []
 tilings_index_vals = []
 tile_encode_index_vals = []
 tiles3_index_vals = []
 
-dims = 2
-tiles_per_dim = 2
-grid = [create_tiling_grid((0.,) * dims, (1.,) * dims, (tiles_per_dim,) * dims, (0.,) * dims)]
+dims = 1
+tiles_per_dim = 10
+tilings = 3
+offsets = [(i/tilings,) * dims for i in range(tilings)]
+grid = [create_tiling_grid((0.,) * dims, (1.,) * dims, (tiles_per_dim,) * dims, offsets=offsets[i]) for i in range(tilings)]
 iht = IHT(10000)
 
-for x in range(1, 10):
-    x /= 10
+pos = (0.6,)
 
-    for y in range(1, 10):
-        y /= 10
+mi, ma = 0.0, 10.0
 
-        pos = [x, y]
+wn = ((ma - mi) / tiles_per_dim) / tilings
+print('w/n =', wn)
 
-        tile_index = int(getTileIndex(dims, tiles_per_dim, pos))
-        tilings_index = getTilingIndex('clip', dims, tiles_per_dim, pos)
-        # tile_encode_index_x, tile_encode_y, tile_encode_z = tile_encode(pos, grid, flatten=True)
-        # tile_encode_index = tile_encode_index_x + tile_encode_y * 2 + tile_encode_z * 4
-        tile_encode_index = tile_encode(pos, tiles_per_dim, grid, flatten=True)
-        # tile_encode_index = tile_encode_index_x + tile_encode_y * 2
+for i in np.arange(mi, ma, round((ma - mi) / 10, 1), dtype=np.float32):
+    i = round(i, 1)
 
-        tile_index_vals.append(tile_index)
-        tilings_index_vals.append(tilings_index)
-        tile_encode_index_vals.append(tile_encode_index)
+    print(i, tiles(None, tilings=tilings, positions=[i * (tiles_per_dim / (ma - mi))]))
 
-results = [
-    np.unique(tile_index_vals, return_counts=True),
-    np.unique(tilings_index_vals, return_counts=True),
-    np.unique(tile_encode_index_vals, return_counts=True)
-]
+# pos = (0.06,)
 
-# pos = [1, 1]
+# tiling_index = getTilingsIndices(dims, tiles_per_dim, tilings, pos)
+# # tc_index = getTCIndices(dims, tiles_per_dim, tilings, 'clip', np.asarray([[0, 0], [0.5, 0.5]]), np.asarray(pos))
+# tc_index = getTCIndices(dims, tiles_per_dim, tilings, 'clip', np.zeros((tilings, dims)), np.asarray(pos))
+# tile_encode_index = tile_encode(pos, tiles_per_dim, grid)
+# tiles3_index_ = np.asarray(tiles(None, tilings=tilings, positions=[pos[0] * 10 * tiles_per_dim]))[:, 1:].flatten()
+# tiles3_index_ = tiles(None, tilings=tilings, positions=[pos[0] * 10 * tiles_per_dim])
+# tiles3_index = coordinates_to_index(np.asarray(tiles(None, tilings=tilings, positions=[pos[0] * 10]))[:, 1:], tiles_per_dim)
 
-# print(tiles(ihtORsize=None, tilings=1, positions=[pos[0] * tiles_per_dim, pos[1] * tiles_per_dim]))
-# print(tile_encode(pos, grid, flatten=True))
+# # for state in np.arange(0, 2.5, 0.15):
+# #     indices = np.asarray(tiles(None, tilings=2, positions=[state]))[:, 1:].flatten()
 
-print('\n'.join(map(str, results)))
+# #     print('{0:.2f}'.format(state), ' -> ', indices)
+
+# print(tiling_index)
+# print(tc_index)
+# print(tile_encode_index)
+# print(tiles3_index_)
+# print(tiles3_index)
+
+# for x in range(1, 10):
+#     x /= 10
+
+#     for y in range(1, 10):
+#         y /= 10
+
+#         pos = [x, y]
+
+#         tile_index = int(getTileIndex(dims, tiles_per_dim, pos))
+#         tilings_index = getTilingIndex('clip', dims, tiles_per_dim, pos)
+#         tile_encode_index = tile_encode(pos, tiles_per_dim, grid, flatten=True)
+
+#         tile_index_vals.append(tile_index)
+#         tilings_index_vals.append(tilings_index)
+#         tile_encode_index_vals.append(tile_encode_index)
+
+# results = [
+#     np.unique(tile_index_vals, return_counts=True),
+#     np.unique(tilings_index_vals, return_counts=True),
+#     np.unique(tile_encode_index_vals, return_counts=True)
+# ]
+
+# # pos = [1, 1]
+
+# # print(tiles(ihtORsize=None, tilings=1, positions=[pos[0] * tiles_per_dim, pos[1] * tiles_per_dim]))
+# # print(tile_encode(pos, grid, flatten=True))
+
+# print('\n'.join(map(str, results)))
