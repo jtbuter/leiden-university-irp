@@ -62,7 +62,7 @@ for width, height in [(16, 8)]:
             best_comps[y:y+height, x:x+width] = best_comp
             best_areas[y:y+height, x:x+width] = best_area
             best_objects[y:y+height, x:x+width] = best_obj
-            difficulty[y:y+height, x:x+width] = float(best_dissim) >= 0.03
+            difficulty[y:y+height, x:x+width] = float(best_dissim) >= 0.02
 
             if float(best_dissim) >= 0.03:
                 print(x, y)

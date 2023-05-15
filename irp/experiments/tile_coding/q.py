@@ -23,7 +23,6 @@ def learn(environment, parameters: Dict, log: Optional[bool] = False):
 
     # We re-initialize the Q-table
     qtable = TiledQTable(environment, tilings, parameters['hash_size'])
-    # alpha /= tilings # TODO: Checken of het beter werkt als we / tilings weghalen in policy.py
 
     # List of outcomes to plot
     outcomes = []
@@ -38,9 +37,10 @@ def learn(environment, parameters: Dict, log: Optional[bool] = False):
 
         # By default, we consider our outcome to be a failure
         outcomes.append(0)
-        
+
         # Until the agent gets stuck in a hole or reaches the goal, keep training it
         while not done:
+        
             # Generate a random number between 0 and 1
             rnd = np.random.random()
 
@@ -50,7 +50,6 @@ def learn(environment, parameters: Dict, log: Optional[bool] = False):
             # Else, take the action with the highest value in the current state
             else:
                 qs = qtable.qs(state)
-
                 action = np.argmax(qs)
 
             # Implement this action and move the agent in the desired direction
@@ -66,9 +65,7 @@ def learn(environment, parameters: Dict, log: Optional[bool] = False):
 
             # Update Q(s,a)
             qtable.update(state, action, target, alpha)
-            # qtable[state][action] = qtable[state][action] + \
-            #                         alpha * (reward + gamma * np.max(qtable[new_state]) - qtable[state][action])
-            
+
             # Update our current state
             state = new_state
 
@@ -77,9 +74,9 @@ def learn(environment, parameters: Dict, log: Optional[bool] = False):
                 outcomes[-1] = 1
                 steps.append(step)
 
-        if e % 50 == 0 and e > 0 and log:
-            model._tb_write('rollout//dissim', np.mean(outcomes[-50:]), e)
-            model._tb_write('rollout//ep_len', np.mean(steps[-50:]), e)
+        if e % 10 == 0 and e > 0 and log:
+            model._tb_write('rollout//dissim', np.mean(outcomes[-10:]), e)
+            model._tb_write('rollout//ep_len', np.mean(steps[-10:]), e)
 
         if e >= learning_delay:
             # Update epsilon
