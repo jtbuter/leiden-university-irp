@@ -3,7 +3,7 @@ from irp.wrappers.utils import tiles, IHT
 import numpy as np
 import numpy.typing as npt
 from dataclasses import dataclass
-from typing import List, Optional, Sequence, Tuple, TypeVar
+from typing import Dict, List, Optional, Sequence, Tuple, TypeVar
 
 def getAxisCell(bound: str, x: float, tiles_per_dim: int):
     # for a 2-d space, this would get the "row" then "col" for a given coordinate
@@ -116,34 +116,99 @@ def coordinates_to_index(coordinates, tiles_per_dim):
 
     return indices
 
+def build_offset(n: int, dims, tiles, tilings, offset: str = 'even'):
+    if offset == 'cascade':
+        tile_length = 1.0 / tiles
+        return np.ones(dims) * n * (tile_length / tilings)
+
+    if offset == 'even':
+        tile_length = 1.0 / tiles
+        i = n - (tilings / 2)
+        return np.ones(dims) * i * (tile_length / tilings)
+
 tile_index_vals = []
 tilings_index_vals = []
 tile_encode_index_vals = []
 tiles3_index_vals = []
 
-dims = 1
-tiles_per_dim = 10
-tilings = 3
+dims = 3
+tiles_per_dim = 2
+tilings = 16
 offsets = [(i/tilings,) * dims for i in range(tilings)]
 grid = [create_tiling_grid((0.,) * dims, (1.,) * dims, (tiles_per_dim,) * dims, offsets=offsets[i]) for i in range(tilings)]
-iht = IHT(10000)
+iht = IHT(100000)
 
 pos = (0.6,)
 
-mi, ma = 0.0, 10.0
+mi, ma = 0.0, 1.0
+w = ((ma - mi) / tiles_per_dim)
+n = tilings
+wn = w / n 
+stepsize = int(round(1 / wn, 0))
 
-wn = ((ma - mi) / tiles_per_dim) / tilings
-print('w/n =', wn)
+# Meer algmene formule Sutton
+print(f'w = {w}, n = {n} -> w/n =', wn)
 
-for i in np.arange(mi, ma, round((ma - mi) / 10, 1), dtype=np.float32):
-    i = round(i, 1)
+multiplier = round(1 / wn / n, 0)
 
-    print(i, tiles(None, tilings=tilings, positions=[i * (tiles_per_dim / (ma - mi))]))
+tile_extremes: Dict[int, Dict[str, List[Tuple]]] = {}
+
+for x in np.linspace(mi, ma, stepsize, endpoint=False, dtype=np.float32):
+    for y in np.linspace(mi, ma, stepsize, endpoint=False, dtype=np.float32):
+        for z in np.linspace(mi, ma, stepsize, endpoint=False, dtype=np.float32):
+            x = round(x, 5)
+            y = round(y, 5)
+            z = round(z, 5)
+
+            scaled_x = x * (tiles_per_dim / (ma - mi))
+            scaled_y = y * (tiles_per_dim / (ma - mi))
+            scaled_z = z * (tiles_per_dim / (ma - mi))
+
+            result = tiles(None, numtilings=tilings, floats=[scaled_x, scaled_y, scaled_z])
+
+            for tile_idx, tile_coord_1, tile_coord_2, tile_coord_3 in result:
+                tile_idx, tile_coord_1, tile_coord_2, tile_coord_3 = int(tile_idx), int(tile_coord_1), int(tile_coord_2), int(tile_coord_3)
+
+                if tile_idx not in tile_extremes:
+                    tile_extremes[tile_idx] = {}
+
+                coord_name = str((tile_coord_1, tile_coord_2, tile_coord_3))
+
+                if coord_name not in tile_extremes[tile_idx]:
+                    tile_extremes[tile_idx][coord_name] = []
+
+                tile_extremes[tile_idx][coord_name].append((float(x), float(y), float(z)))
+
+
+        # print(x, y, result)
+
+base_x, base_y, base_z = tile_extremes[0]['(0, 0, 0)'][-1]
+
+# print(tile_extremes)
+for tile_idx in tile_extremes:
+    print(tile_idx)
+
+    max_x, max_y, max_z = tile_extremes[tile_idx][next(iter(tile_extremes[tile_idx]))][-1]
+
+    print('\t', (base_x - max_x) / (wn), (base_y - max_y) / (wn), (base_z - max_z) / (wn))
+
+    # for coord_name in tile_extremes[tile_idx]:
+        # print(f'\t{coord_name}')
+        # print(f'\t\t{tile_extremes[tile_idx][coord_name][-1]}')
+        # print()
+
+
+offsets = np.asarray([[0, 0], [0.5, 0.5]])
+offsets = [build_offset(n, dims, tiles_per_dim, tilings) for n in range(tilings)]
+
+print(offsets)
+
+# tc_index = getTCIndices(dims, tiles_per_dim, tilings, 'clip', offsets, np.asarray(pos))
+
 
 # pos = (0.06,)
 
 # tiling_index = getTilingsIndices(dims, tiles_per_dim, tilings, pos)
-# # tc_index = getTCIndices(dims, tiles_per_dim, tilings, 'clip', np.asarray([[0, 0], [0.5, 0.5]]), np.asarray(pos))
 # tc_index = getTCIndices(dims, tiles_per_dim, tilings, 'clip', np.zeros((tilings, dims)), np.asarray(pos))
 # tile_encode_index = tile_encode(pos, tiles_per_dim, grid)
 # tiles3_index_ = np.asarray(tiles(None, tilings=tilings, positions=[pos[0] * 10 * tiles_per_dim]))[:, 1:].flatten()

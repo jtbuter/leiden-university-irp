@@ -22,7 +22,10 @@ def get_dims(*args: List[gym.spaces.Space]) -> Tuple[int, ...]:
 
     return dims
 
+basehash = hash
+
 class IHT:
+    "Structure to handle collisions"
     def __init__(self, size: int):
         self.size = size
         self.overfull_count = 0
@@ -30,10 +33,10 @@ class IHT:
 
     def count(self) -> int:
         return len(self.dictionary)
-
+    
     def fullp(self) -> bool:
         return len(self.dictionary) >= self.size
-
+    
     def getindex(
         self,
         obj: Tuple[float, ...],
@@ -43,19 +46,19 @@ class IHT:
 
         if obj in d: return d[obj]
         elif readonly: return None
-        
+
         size = self.size
         count = self.count()
 
         if count >= size:
-            if self.overfull_count == 0: print('IHT full, starting to allow collisions')
-        
-            self.overfull_count += 1
-        
-            return hash(obj) % self.size
+            if self.overfullCount == 0: raise ValueError('IHT full, starting to allow collisions')
+            
+            self.overfullCount += 1
+
+            return basehash(obj) % self.size
         else:
             d[obj] = count
-
+            
             return count
 
 def hashcoords(
@@ -63,37 +66,61 @@ def hashcoords(
     m: Union[IHT, int, None],
     readonly: bool = False
 ) -> Union[Tuple[float, ...], int]:
-    if m is None: return coordinates
-    if isinstance(m, IHT): return m.getindex(tuple(coordinates), readonly)
-    if isinstance(m, int): return hash(tuple(coordinates)) % m
+    if type(m)==IHT: return m.getindex(tuple(coordinates), readonly)
+    if type(m)==int: return basehash(tuple(coordinates)) % m
+    if m==None: return coordinates
 
 def tiles(
     ihtORsize: Union[IHT, int, None],
-    tilings: int,
-    positions: List[float],
-    actions: List[int] = [],
+    numtilings: int,
+    floats: List[float],
+    ints: List[int] = [],
     readonly: bool = False
 ) -> Union[List[int], List[Tuple[float, ...]]]:
-    qpositions = [math.floor(f * tilings) for f in positions]
-    tiles_ = []
+    """returns num-tilings tile indices corresponding to the floats and ints"""
+    qfloats = [math.floor(f * numtilings) for f in floats]
+    Tiles = []
 
-    for tiling in range(tilings):
+    for tiling in range(numtilings):
         tilingX2 = tiling * 2
         coords = [tiling]
         b = tiling
-        
-        for q in qpositions:
-            coords.append((q + b) // tilings )
 
+        for q in qfloats:
+            coords.append((q + b) // numtilings )
             b += tilingX2
 
-        coords.extend(actions)
+        coords.extend(ints)
+        Tiles.append(hashcoords(coords, ihtORsize, readonly))
 
-        tiles_.append(hashcoords(coords, ihtORsize, readonly))
-
-    return tiles_
+    return Tiles
 
 def min_max_scaling(x, mi, ma):
     # Assumes we're working with Sutton tile-coding (i.e. division of 10.0)
     return np.clip((x - mi) * (10.0 / (ma - mi)), 0, 10.0)
+
+#!/usr/bin/env python
+import numpy as np
+
+class TileCoder:
+    def __init__(self, tiles_per_dim, value_limits, tilings, offset=lambda n: 2 * np.arange(n) + 1):
+        tiling_dims = np.array(np.ceil(tiles_per_dim), dtype=np.int) + 1
+        self._offsets = offset(len(tiles_per_dim)) * \
+            np.repeat([np.arange(tilings)], len(tiles_per_dim), 0).T / float(tilings) % 1
+
+        print(self._offsets)
+
+        self._limits = np.array(value_limits)
+        self._norm_dims = np.array(tiles_per_dim) / (self._limits[:, 1] - self._limits[:, 0])
+        self._tile_base_ind = np.prod(tiling_dims) * np.arange(tilings)
+        self._hash_vec = np.array([np.prod(tiling_dims[0:i]) for i in range(len(tiles_per_dim))])
+        self._n_tiles = tilings * np.prod(tiling_dims)
+  
+    def __getitem__(self, x):
+        off_coords = ((x - self._limits[:, 0]) * self._norm_dims + self._offsets).astype(int)
+        return self._tile_base_ind + np.dot(off_coords, self._hash_vec)
+
+    @property
+    def n_tiles(self):
+        return self._n_tiles
 
