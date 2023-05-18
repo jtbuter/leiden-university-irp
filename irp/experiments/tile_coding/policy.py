@@ -17,6 +17,7 @@ class TiledQTable():
         self.tilings = tilings
         self.qtable = self._build_qtable(environment, iht)
 
+        self.environment = environment
         self.action_space = environment.action_space
 
     def _build_qtable(self, environment: gym.Env, iht: Union[IHT, int, None]) -> np.ndarray:
@@ -35,15 +36,19 @@ class TiledQTable():
     def value(self, state: List[int], action: int) -> float:
         value = 0.0
 
+        # The terminal state should be absorbing
+        if self.environment.is_done():
+            return value
+
         for tile in state:
             try:
-                value += self.qtable[tile, action] / self.tilings
+                value += self.qtable[tile, action]
             except Warning:
                 print(value, self.qtable[tile, action])
 
                 raise Exception()
 
-        return value
+        return value / self.tilings
 
     def update(self, state: List[int], action: int, target: float, alpha: float):
         import warnings

@@ -47,11 +47,16 @@ def apply_opening(
 
 def get_intensity_spectrum(
     sample: np.ndarray,
-    n_thresholds: int
+    n_thresholds: int,
+    add_minus: Optional[bool] = False
 ) -> np.ndarray:
     minimum, maximum = np.min(sample), np.max(sample)
+    intensity_spectrum = np.linspace(minimum, maximum, n_thresholds)
 
-    return np.linspace(minimum, maximum, n_thresholds)
+    if not add_minus:
+        return intensity_spectrum
+
+    return np.insert(intensity_spectrum, 0, -1.0)
 
 def compute_dissimilarity(
     bitmask: np.ndarray,

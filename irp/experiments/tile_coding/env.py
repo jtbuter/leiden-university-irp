@@ -43,7 +43,10 @@ class Env(gym.Env):
         else:
             reward = 0
 
-        return UltraSoundEnv.observation(self.bitmask), reward, done, {'d_sim': d_sim}
+        # Expose the dissimilarity, e.g. for logging
+        self.info = {'d_sim': d_sim}
+
+        return UltraSoundEnv.observation(self.bitmask), reward, done, self.info
 
     def reset(self, ti: Optional[int] = None):
         # Pick random threshold intensity, or use the one specified by the user
@@ -55,10 +58,13 @@ class Env(gym.Env):
 
         return UltraSoundEnv.observation(self.bitmask)
 
+    def is_done(self) -> bool:
+        return self.info['d_sim'] <= self._d_sim
+
     @property
-    def d_sim(self):
+    def d_sim(self) -> float:
         return self._d_sim
 
     @property
-    def intensity_spectrum(self):
+    def intensity_spectrum(self) -> np.ndarray:
         return self._intensity_spectrum

@@ -1,12 +1,13 @@
 import gym
 import random
 import numpy as np
+import matplotlib.pyplot as plt
+plt.rcParams['figure.dpi'] = 300
+plt.rcParams.update({'font.size': 17})
 
-environment = gym.make("FrozenLake-v1", is_slippery=False)
+# Initialize the slippery Frozen Lake
+environment = gym.make("FrozenLake-v1", is_slippery=True)
 environment.reset()
-
-nb_states = environment.observation_space.n  # = 16
-nb_actions = environment.action_space.n      # = 4
 
 # We re-initialize the Q-table
 qtable = np.zeros((environment.observation_space.n, environment.action_space.n))
@@ -46,10 +47,11 @@ for _ in range(episodes):
              
         # Implement this action and move the agent in the desired direction
         new_state, reward, done, info = environment.step(action)
+        value = 0.0 if done else np.max(qtable[new_state])
 
         # Update Q(s,a)
         qtable[state, action] = qtable[state, action] + \
-                                alpha * (reward + gamma * np.max(qtable[new_state]) - qtable[state, action])
+                                alpha * (reward + gamma * value - qtable[state, action])
         
         # Update our current state
         state = new_state
@@ -65,3 +67,36 @@ print()
 print('===========================================')
 print('Q-table after training:')
 print(qtable)
+
+# Plot outcomes
+plt.figure(figsize=(12, 5))
+plt.xlabel("Run number")
+plt.ylabel("Outcome")
+ax = plt.gca()
+plt.bar(range(len(outcomes)), outcomes, width=1.0)
+plt.show()
+
+episodes = 100
+nb_success = 0
+
+# Evaluation
+for _ in range(100):
+    state = environment.reset()
+    done = False
+    
+    # Until the agent gets stuck or reaches the goal, keep training it
+    while not done:
+        # Choose the action with the highest value in the current state
+        action = np.argmax(qtable[state])
+
+        # Implement this action and move the agent in the desired direction
+        new_state, reward, done, info = environment.step(action)
+
+        # Update our current state
+        state = new_state
+
+        # When we get a reward, it means we solved the game
+        nb_success += reward
+
+# Let's check our success rate!
+print (f"Success rate = {nb_success/episodes*100}%")
