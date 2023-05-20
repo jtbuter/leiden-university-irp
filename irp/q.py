@@ -3,6 +3,7 @@ import os
 import glob
 import pathlib
 import time
+import warnings
 import sys
 from typing import Dict, Iterable, List, Optional, Tuple, Type, TypeVar, Union
 
@@ -10,6 +11,8 @@ from copy import deepcopy
 
 from gym import spaces
 import numpy as np
+
+import irp.wrappers as wrappers
 
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.policies import BasePolicy
@@ -41,7 +44,8 @@ class Q(BaseAlgorithm):
         verbose: int = 0, monitor_wrapper: bool = True,
         seed: Optional[int] = None,
         use_sb3_env = True,
-        init_setup_model=True
+        init_setup_model = True,
+        strict: Optional[bool] = True
     ):
         super().__init__(
             policy='MlpPolicy', env=env, learning_rate=learning_rate, tensorboard_log=tensorboard_log,
@@ -49,7 +53,10 @@ class Q(BaseAlgorithm):
             seed=seed, supported_action_spaces=(spaces.Discrete,)
         )
 
-        assert len(env.observation_space.shape) > 0, "State space too small, wrap in an ExpandDimsWrapper"
+        if strict and len(env.observation_space.shape) == 0:
+            env = wrappers.ExpandDims(env)
+
+            warnings.warn('Found too low dimensionality, adding ExpandDims wrapper')
 
         self.gamma = gamma
         self.exploration_rate = 0.0

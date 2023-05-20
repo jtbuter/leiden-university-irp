@@ -6,60 +6,44 @@ from gym.spaces import Space
 import numpy as np
 import irp.wrappers as wrappers
 
-if TYPE_CHECKING:
-    from irp.wrappers.utils import IHT
-
 class Tiled(gym.Wrapper):
     def __init__(
         self,
         env: gym.Env,
-        lows: Union[Dict, List],
-        highs: Union[Dict, List],
+        tiles_per_dim: Tuple[int, ...],
         tilings: int,
-        iht: Optional[Union[IHT, int]] = None,
-        rescale: Optional[bool] = False
+        limits: List[Tuple[float, ...]]
     ):
         super().__init__(env)
 
-        if iht is None:
-            self._observation_space = wrappers.utils.get_dims(env.observation_space) + (1,)
-        elif isinstance(iht, wrappers.utils.IHT):
-            self._observation_space = gym.spaces.MultiDiscrete(nvec=(1,) * tilings)
-        elif isinstance(iht, int):
-            self._observation_space = gym.spaces.Discrete(nvec=(1,) * tilings)
+        self._T = wrappers.utils.TileCoder(tiles_per_dim, limits, tilings)
+        self._observation_space = gym.spaces.MultiDiscrete(nvec=(1,) * tilings)
 
         self._action_space = env.action_space
-        self._IHT = iht
         self._tilings = tilings
-        self._rescale = rescale
 
-        self._setup_env(lows, highs)
+        self.env: gym.Env
 
-    def _setup_env(self, lows: Union[Dict, List], highs: Union[Dict, List]):
-        self._input_limits = np.array([lows, highs])
+    @property
+    def T(self) -> wrappers.utils.TileCoder:
+        return self._T
 
     @classmethod
     def encode(
         self,
-        iht: Union[IHT, int, None],
-        tilings: int,
-        state: List[float],
-        rescale: Optional[bool] = False,
-        input_limits: Optional[np.ndarray] = None
-    ):
-        if rescale:
-            state = wrappers.utils.min_max_scaling(state, *input_limits)
+        T: wrappers.utils.TileCoder,
+        state: Tuple[float, ...]
+    ) -> np.ndarray:
+        return T[state]
 
-        return wrappers.utils.tiles(iht, tilings, state)
-
-    def step(self, action: int):
+    def step(self, action: int) -> Tuple[np.ndarray, float, bool, Dict]:
         state, reward, done, info = self.env.step(action)
-        encoded = self.encode(self._IHT, self._tilings, state, self._rescale, self._input_limits)
+        encoded = self.encode(self._T, state)
 
-        return np.asarray(encoded), reward, done, info
+        return encoded, reward, done, info
 
-    def reset(self, **kwargs: Dict):
+    def reset(self, **kwargs: Dict) -> np.ndarray:
         state = self.env.reset(**kwargs)
-        encoded = self.encode(self._IHT, self._tilings, state, self._rescale, self._input_limits)
+        encoded = self.encode(self._T, state)
 
-        return np.asarray(encoded)
+        return encoded

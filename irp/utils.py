@@ -336,35 +336,33 @@ def get_neighborhood_images(
     subimages: List[np.ndarray],
     sublabels: List[np.ndarray],
     coord: Union[int, Tuple],
-    shape: Tuple[int, int],
     subimage_width: int,
     subimage_height: int,
     overlap: Optional[float] = 0,
-    n_size: Optional[int] = 1
+    n_size: Optional[int] = 1,
+    shape: Optional[Tuple[int, int]] = (512, 512)
 ) -> np.ndarray:
-    neighborhood_coords = irp.utils.get_neighborhood(coord, shape, subimage_width, subimage_height, overlap, n_size)
+    neighborhood_coords = get_neighborhood(coord, shape, subimage_width, subimage_height, overlap, n_size)
     neighborhood_ids = [
         coord_to_id(coord_, shape, subimage_width, subimage_height, overlap) for coord_ in neighborhood_coords
     ]
-    
+
     return np.asarray([subimages[i] for i in neighborhood_ids]), np.asarray([sublabels[i] for i in neighborhood_ids])
 
-def get_best_dissimilarity(subimage, sublabel, tis, return_ti = False):
+def get_best_dissimilarity(subimage, sublabel, ths: np.ndarray, return_th = False) -> Union[float, Tuple[float, int]]:
     best_dissim = np.inf
-    best_ti = -1
+    best_th = -1
 
-    for ti in tis:
-        ti = int(ti)
-
-        bitmask = envs.utils.apply_threshold(subimage, ti)
+    for th in ths:
+        bitmask = envs.utils.apply_threshold(subimage, int(th))
         dissim = envs.utils.compute_dissimilarity(bitmask, sublabel)
 
         if dissim < best_dissim:
             best_dissim = dissim
-            best_ti = ti
+            best_th = th
 
-    if return_ti:
-        return float(best_dissim), best_ti
+    if return_th:
+        return float(best_dissim), best_th
 
     return float(best_dissim)
 

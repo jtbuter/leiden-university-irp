@@ -7,12 +7,17 @@ import irp.envs as envs
 import irp.wrappers as wrappers
 from irp.envs.ultrasound.ultra_sound_env import UltraSoundEnv
 
+id_to_loc_map = [
+    'bottom-left', 'bottom-center', 'bottom-right',
+    'center-left', 'middle', 'center-right',
+    'top-left', 'top-center', 'top-right',
+]
+
 # Train and test filename, and characteristics of the subimages
 train_name = 'case10_10.png'
 test_name = 'case10_11.png'
 subimage_width, subimage_height = 16, 8
-shape = (512, 512)
-overlap = 0.75
+overlap = 0.875
 
 # Get all the subimages
 train_Xs, train_ys = np.asarray(
@@ -22,7 +27,7 @@ test_Xs, test_ys = np.asarray(
     irp.utils.make_sample_label(test_name, width=subimage_width, height=subimage_height, overlap=0, idx=None)
 )[0]
 
-# coordinates = [(256, 176), (272, 176), (240, 184), (224, 192)]
+# coordinates = [(256, 176), coord, (240, 184), (224, 192)]
 # ids = np.asarray([
 #     irp.utils.coord_to_id(coord, (512, 512), subimage_width, subimage_height, overlap) for coord in coordinates
 # ])
@@ -30,14 +35,18 @@ test_Xs, test_ys = np.asarray(
 # train_Xs = train_Xs[ids]
 # train_ys = train_ys[ids]
 
-idx = irp.utils.coord_to_id((272, 176), (512, 512), subimage_width, subimage_height, overlap)
+coord = (288, 224)
+
+idx = irp.utils.coord_to_id(coord, (512, 512), subimage_width, subimage_height, overlap)
 train_Xs, train_ys = irp.utils.get_neighborhood_images(
-    train_Xs, train_ys, idx, shape, subimage_width, subimage_height, overlap, n_size=1
+    train_Xs, train_ys, idx, subimage_width, subimage_height, overlap, n_size=1
 )
 
-n_thresholds = 5
+# irp.utils.show(train_ys[4])
 
-fig = plt.figure()
+n_thresholds = 4
+
+fig = plt.figure(figsize=(15, 15))
 ax = fig.add_subplot(projection='3d')
 
 for t, (sample, label) in enumerate(zip(train_Xs, train_ys)):
@@ -52,7 +61,7 @@ for t, (sample, label) in enumerate(zip(train_Xs, train_ys)):
 
         observations.append((a, c, no))
 
-    ax.scatter(*zip(*observations), label=f'{t}', depthshade=False, s=50)
+    ax.scatter(*zip(*observations), label=f'{id_to_loc_map[t]}', depthshade=False, s=50)
 
 sample = test_Xs[721]
 

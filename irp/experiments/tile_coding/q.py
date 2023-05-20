@@ -1,4 +1,5 @@
 from typing import Dict, Optional
+import gym
 import numpy as np
 
 import os
@@ -7,7 +8,7 @@ import irp.wrappers as wrappers
 import irp.q
 from irp.experiments.tile_coding.policy import TiledQTable
 
-def learn(environment, parameters: Dict, log: Optional[bool] = False):
+def learn(environment: gym.Env, parameters: Dict, log: Optional[bool] = False):
     if log:
         model = irp.q.Q(environment, 0.0, tensorboard_log=os.path.join(irp.ROOT_DIR, 'results/tile_coding'))
         model.learn(0)
@@ -19,10 +20,9 @@ def learn(environment, parameters: Dict, log: Optional[bool] = False):
     epsilon_decay = parameters['epsilon_decay']
     min_epsilon = parameters['min_epsilon']
     learning_delay = parameters['learning_delay']
-    tilings = parameters['tilings']
 
     # We re-initialize the Q-table
-    qtable = TiledQTable(environment, tilings, parameters['hash_size'])
+    qtable = TiledQTable(environment)
 
     # List of outcomes to plot
     outcomes = []
@@ -49,25 +49,25 @@ def learn(environment, parameters: Dict, log: Optional[bool] = False):
                 action = environment.action_space.sample()
             # Else, take the action with the highest value in the current state
             else:
-                qs = qtable.qs(state)
-                action = np.argmax(qs)
+                action = np.argmax(qtable.state_values(state))
 
             # Implement this action and move the agent in the desired direction
             new_state, reward, done, info = environment.step(action)
 
-            step += 1
-
             d_sims.append(info['d_sim'])
 
             # Compute the target
-            qs = qtable.qs(new_state)
-            target = reward + gamma * max(qs)
+            value = max(qtable.state_values(new_state))
+            # Terminal states should have no future reward; multiply with (not `done`)
+            target = reward + gamma * value * (not done)
 
             # Update Q(s,a)
             qtable.update(state, action, target, alpha)
 
             # Update our current state
             state = new_state
+
+            step += 1
 
             # If we have a reward, it means that our outcome is a success
             if reward:

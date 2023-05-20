@@ -51,7 +51,7 @@ def get_intensity_spectrum(
     add_minus: Optional[bool] = False
 ) -> np.ndarray:
     minimum, maximum = np.min(sample), np.max(sample)
-    intensity_spectrum = np.linspace(minimum, maximum, n_thresholds)
+    intensity_spectrum = np.linspace(minimum, maximum, n_thresholds, dtype=np.uint64)
 
     if not add_minus:
         return intensity_spectrum
