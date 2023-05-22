@@ -1,4 +1,5 @@
 from typing import Dict, Optional
+import gym
 import numpy as np
 
 import os
@@ -7,7 +8,7 @@ import irp.wrappers as wrappers
 import irp.q
 from irp.experiments.tile_coding.policy import TiledQTable
 
-def learn(environment, parameters: Dict, log: Optional[bool] = False):
+def learn(environment: gym.Env, parameters: Dict, log: Optional[bool] = False):
     if log:
         model = irp.q.Q(environment, 0.0, tensorboard_log=os.path.join(irp.ROOT_DIR, 'results/tile_coding'))
         model.learn(0)
@@ -62,7 +63,7 @@ def learn(environment, parameters: Dict, log: Optional[bool] = False):
 
             # Compute the target
             qs = qtable.qs(new_state)
-            target = reward + gamma * max(qs)
+            target = reward + gamma * max(qs) * (not done)
 
             # Update Q(s,a)
             qtable.update(state, action, target, alpha)
@@ -72,8 +73,8 @@ def learn(environment, parameters: Dict, log: Optional[bool] = False):
             # Update our current state
             state = new_state
 
-            # If we have a reward, it means that our outcome is a success
-            if reward:
+            # If we have a positive reward, it means that our outcome is a success
+            if reward > 0:
                 outcomes[-1] = 1
                 steps.append(step)
 

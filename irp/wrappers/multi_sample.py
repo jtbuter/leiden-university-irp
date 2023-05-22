@@ -33,3 +33,7 @@ class MultiSample(gym.Wrapper):
             super().__init__(env)
 
         self._envs.append(env)
+
+    @property
+    def envs(self):
+        return self._envs

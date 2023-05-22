@@ -16,10 +16,11 @@ from sklearn.model_selection import ParameterGrid
 
 if __name__ == "__main__":
     grid = ParameterGrid({
-        'n_thresholds': [3],
-        'overlap': [0.75],
+        'n_thresholds': [5],
         'n_size': [1],
-        'tilings': [16]
+        'overlap': [0.75],
+        'tilings': [32],
+        'tiles_per_dim': [(10, 10, 10)]
     })
 
     results = {}
@@ -31,29 +32,33 @@ if __name__ == "__main__":
 
         train_name = 'case10_10.png'
         subimage_width, subimage_height = 16, 8
-        overlap = param['overlap']
-        shape = (512, 512)
-        n_size = param['n_size']
 
         # Hyperparameters
         parameters = {
             'learning_delay': 500,  # Delay until epsilon starts updating
             'episodes': 2000,       # Total number of episodes
-            'alpha': 0.6,           # Learning rate
+            'alpha': 0.1,           # Learning rate
             'gamma': 0.9,           # Discount factor
             'epsilon': 1.0,         # Amount of randomness in the action selection
             'epsilon_decay': 0.001, # Fixed amount to decrease
-            'tilings': 16,          # Number of tilings to use
-            'n_thresholds': 5,
-            'hash_size': 2**12,
-            'min_epsilon': 0.05
+            'tilings': 32,          # Number of tilings to use
+            'n_thresholds': 4,
+            'min_epsilon': 0.05,
+            'tiles_per_dim': (4, 4, 4),
+            'overlap': 0.75,
+            'n_size': 2,
         }
 
-        tilings = param['tilings']
-        n_thresholds = param['n_thresholds']
+        tiles_per_dim = parameters['tiles_per_dim']
+        tilings = parameters['tilings']
+        n_thresholds = parameters['n_thresholds']
+        overlap = parameters['overlap']
+        n_size = parameters['n_size']
+
+        shape = (512, 512)
 
         coords = [(192, 176), (256, 232), (304, 288), (336, 248), (272, 176)]
-        coords = [(256, 224)]
+        coords = [(288, 184)]
 
         for coord in coords:
             solved = []
@@ -61,7 +66,6 @@ if __name__ == "__main__":
             for xy in range(3):
                 solved.append(0)
             
-                iht = wrappers.utils.IHT(parameters['hash_size'])
                 idx = irp.utils.coord_to_id(coord, shape, subimage_width, subimage_height, overlap)
 
                 # Get all the training subimages
@@ -79,10 +83,12 @@ if __name__ == "__main__":
 
                 for subimage, sublabel in zip(n_subimages, n_sublabels):
                     environment = env.Env(subimage, sublabel, n_thresholds)
-                    environment = gym.wrappers.TimeLimit(environment, 30) # TODO: Kunnen we deze weghalen uiteindelijk
-                    environment = wrappers.Tiled(environment, lows=(0, 0, 0), highs=(1, 1, 32), tilings=tilings, iht=iht, rescale=True)
+                    environment = gym.wrappers.TimeLimit(environment, environment.n_thresholds) # TODO: Kunnen we deze weghalen uiteindelijk
+                    environment = wrappers.Tiled(environment, tiles_per_dim=tiles_per_dim, value_limits=[(0, 1), (0, 1), (0, 32)], tilings=tilings)
 
                     environments.add(environment)
+
+                parameters['hash_size'] = environments.T.n_tiles
 
                 qtable = q.learn(environments, parameters, log=True)
 
@@ -93,24 +99,29 @@ if __name__ == "__main__":
                 )[0]
 
                 environment = env.Env(subimage, sublabel, n_thresholds)
-                environment = gym.wrappers.TimeLimit(environment, 30) # TODO: Kunnen we deze weghalen uiteindelijk
-                environment = wrappers.Tiled(environment, lows=(0, 0, 0), highs=(1, 1, 32), tilings=tilings, iht=iht, rescale=True)
+                environment = gym.wrappers.TimeLimit(environment, environment.n_thresholds) # TODO: Kunnen we deze weghalen uiteindelijk
+                environment = wrappers.Tiled(environment, tiles_per_dim=tiles_per_dim, value_limits=[(0, 1), (0, 1), (0, 32)], tilings=tilings)
 
-                # print("Best obtainable dissimilarity:", environment.d_sim)
+                print("Best obtainable dissimilarity:", environment.d_sim)
 
-                s = environment.reset(ti=environment.n_thresholds - 1)
+                s = environment.reset(ti=0)
 
-                for j in range(environment.n_thresholds + 2):
+                for j in range(environment.n_thresholds):
                     a = np.argmax(qtable.qs(s))
                     s, r, d, info = environment.step(a)
+                    print('action', a)
 
                     # print(info['d_sim'])
 
-                print(environment.ti)
-                irp.utils.show(environment.bitmask)
+                print(qtable.qs(s))
+
+                # print(environment.ti)
+                irp.utils.show(np.hstack([environment.bitmask, environment.label]))
 
                 if np.isclose(info['d_sim'], environment.d_sim):
                     solved[-1] = 1
+
+                    print('Solved')
 
             results[str(param)][str(coord)] = solved
 

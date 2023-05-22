@@ -20,9 +20,18 @@ test_name =  'case10_11.png'
 real_label = irp.utils.read_image(os.path.join(irp.GIT_DIR, '../data/trus/labels/', test_name))
 
 subimage_width, subimage_height = 16, 8
-overlap = 0.75
+grid = ParameterGrid({
+    'n_thresholds': [5],
+    'overlap': [0.75],
+    'n_size': [1],
+    'tilings': [32]
+})
+
+param = grid[0]
+
+overlap = param['overlap']
 shape = (512, 512)
-n_size = 1
+n_size = param['n_size']
 
 # Hyperparameters
 parameters = {
@@ -32,14 +41,14 @@ parameters = {
     'gamma': 0.9,           # Discount factor
     'epsilon': 1.0,         # Amount of randomness in the action selection
     'epsilon_decay': 0.001, # Fixed amount to decrease
-    'tilings': 16,          # Number of tilings to use
-    'n_thresholds': 3,
+    'tilings': 32,          # Number of tilings to use
+    'n_thresholds': 5,
     'hash_size': 2**12,
     'min_epsilon': 0.05
 }
 
-tilings = parameters['tilings']
-n_thresholds = parameters['n_thresholds']
+tilings = param['tilings']
+n_thresholds = param['n_thresholds']
 
 coords = irp.utils.extract_subimages(np.zeros((512, 512)), subimage_width, subimage_height, 0)[1]
 
@@ -77,7 +86,7 @@ for coord in coords:
 
         environments.add(environment)
 
-    qtable = q.learn(environments, parameters, log=True)
+    qtable = q.learn(environments, parameters, log=False)
 
     # Define the test filename and get all the subimages
     test_X, test_y = np.asarray(
@@ -98,6 +107,7 @@ for coord in coords:
     if np.isclose(info['d_sim'], environment.d_sim):
         print("Solved", coord)
     else:
+        print("Failed", coord)
         failed.append(coord)
 
     result[y:y + subimage_height, x:x + subimage_width] = environment.bitmask

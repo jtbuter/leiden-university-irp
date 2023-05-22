@@ -13,19 +13,14 @@ if TYPE_CHECKING:
     from irp.wrappers.utils import IHT
 
 class TiledQTable():
-    def __init__(self, environment: gym.Env, tilings: int, iht: Union[IHT, int, None]):
+    def __init__(self, environment: gym.Env, tilings: int, iht: int):
         self.tilings = tilings
         self.qtable = self._build_qtable(environment, iht)
 
         self.action_space = environment.action_space
 
     def _build_qtable(self, environment: gym.Env, iht: Union[IHT, int, None]) -> np.ndarray:
-        if iht is None:
-            dims = wrappers.utils.get_dims(environment.observation_space, environment.action_space)
-        elif isinstance(iht, int):
-            dims = (iht,) + wrappers.utils.get_dims(environment.action_space)
-        elif isinstance(iht, IHT):
-            dims = (iht.size,) + wrappers.utils.get_dims(environment.action_space)
+        dims = (iht,) + wrappers.utils.get_dims(environment.action_space)
 
         return np.zeros(dims)
 
@@ -33,36 +28,8 @@ class TiledQTable():
         return [self.value(state, a) for a in range(self.action_space.n)]
 
     def value(self, state: List[int], action: int) -> float:
-        value = 0.0
-
-        for tile in state:
-            try:
-                value += self.qtable[tile, action] / self.tilings
-            except Warning:
-                print(value, self.qtable[tile, action])
-
-                raise Exception()
-
-        return value
+        return self.qtable[state, action].mean()
 
     def update(self, state: List[int], action: int, target: float, alpha: float):
-        import warnings
-        warnings.filterwarnings('error')
-
-        # estimate = 0.0
-
-        # for tile in state:
-        #     estimate += self.qtable[tile, action]
-
-        # error = target - estimate
-
-        # for tile in state:
-        #     self.qtable[tile, action] += alpha * error
-
         for tile in state: # TODO Deze manier weer gebruiken
-            try:
-                self.qtable[tile, action] += alpha * (target - self.qtable[tile, action])
-            except Warning:
-                print(self.qtable[tile, action], alpha * (target - self.qtable[tile, action]))
-
-                raise Exception()
+            self.qtable[tile, action] += alpha * (target - self.qtable[tile, action])

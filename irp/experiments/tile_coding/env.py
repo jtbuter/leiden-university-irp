@@ -8,7 +8,7 @@ from irp.envs.ultrasound.ultra_sound_env import UltraSoundEnv
 
 class Env(gym.Env):
     # Defines how thresholds can be modified
-    action_mapping = [1, 0, -1]
+    action_mapping = [0, -1, 1]
 
     def __init__(self, sample: np.ndarray, label: np.ndarray, n_thresholds: int):
         self.sample = sample
@@ -21,7 +21,7 @@ class Env(gym.Env):
         
         self.n_thresholds = n_thresholds + 1
 
-        self._d_sim = irp.utils.get_best_dissimilarity(sample, label, self._intensity_spectrum)
+        self._d_sim, self.ti_opt = irp.utils.get_best_dissimilarity(sample, label, self._intensity_spectrum, return_ti=True)
 
     def step(self, action: int):
         # Update the threshold index
@@ -41,13 +41,16 @@ class Env(gym.Env):
         if done:
             reward = 1
         else:
-            reward = 0
+            reward = -1
 
         return UltraSoundEnv.observation(self.bitmask), reward, done, {'d_sim': d_sim}
 
     def reset(self, ti: Optional[int] = None):
+        tis = list(range(self.n_thresholds))
+        tis.remove(self.ti_opt)
+        # self.ti = np.random.randint(0, self.n_thresholds) if ti is None else ti
         # Pick random threshold intensity, or use the one specified by the user
-        self.ti = np.random.randint(0, self.n_thresholds) if ti is None else ti
+        self.ti = np.random.choice(tis) if ti is None else ti
         th = self._intensity_spectrum[self.ti]
 
         # Compute the bitmask

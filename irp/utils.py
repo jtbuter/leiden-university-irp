@@ -353,7 +353,7 @@ def get_best_dissimilarity(subimage, sublabel, tis, return_ti = False):
     best_dissim = np.inf
     best_ti = -1
 
-    for ti in tis:
+    for m, ti in enumerate(tis):
         ti = int(ti)
 
         bitmask = envs.utils.apply_threshold(subimage, ti)
@@ -361,7 +361,7 @@ def get_best_dissimilarity(subimage, sublabel, tis, return_ti = False):
 
         if dissim < best_dissim:
             best_dissim = dissim
-            best_ti = ti
+            best_ti = m
 
     if return_ti:
         return float(best_dissim), best_ti
