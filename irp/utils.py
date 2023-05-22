@@ -132,7 +132,7 @@ def make_sample_label(*file_names, idx=184, width=32, height=16, overlap=0):
     
     for file_name in file_names:
         image = read_image(os.path.join(image_path, file_name))
-        image = median_filter(image, 7)
+        image = median_filter(image, 15)
         label = read_image(os.path.join(label_path, file_name))
 
         subimages, coords = extract_subimages(image, width, height, overlap)
@@ -247,7 +247,7 @@ def get_subimages(filename, width=32, height=16, overlap=0):
     label_path = os.path.join(base_path, 'labels')
     # Read the image and label
     image = read_image(os.path.join(image_path, filename))
-    image = median_filter(image, 7)
+    image = median_filter(image, 15)
     label = read_image(os.path.join(label_path, filename))
 
     subimages = extract_subimages(image, width, height, overlap)[0]
@@ -305,22 +305,34 @@ def unravel_index(
 
     return x, y
 
+def diamond(n):
+    a = np.arange(n)
+    b = np.minimum(a, a[::-1])
+    
+    return (b[:, None] + b) >= (n - 1) // 2
+
 def get_neighborhood(
     coord: Union[int, Tuple],
     shape: Tuple[int, int],
     subimage_width: int,
     subimage_height: int,
     overlap: Optional[float] = 0,
-    n_size: Optional[int] = 1
+    n_size: Optional[int] = 1,
+    neighborhood = 'moore'
 ) -> List[Tuple]:
     if isinstance(coord, int):
         coord = id_to_coord(coord, shape, subimage_width, subimage_height, overlap)
 
-    width_step_size = int((1 - overlap) * subimage_width)
-    height_step_size = int((1 - overlap) * subimage_height)
+    width_step_size = round((1 - overlap) * subimage_width, 0)
+    height_step_size = round((1 - overlap) * subimage_height, 0)
 
     x, y = coord
     coords = []
+
+    if neighborhood == 'neumann':
+        neighbor_map = diamond(n_size * 2 + 1).flatten()
+    else:
+        neighbor_map = np.ones((n_size * 2 + 1, n_size * 2 + 1), dtype=bool).flatten()
 
     for y_i in range(-n_size, n_size + 1):
         y_i *= height_step_size
@@ -330,7 +342,7 @@ def get_neighborhood(
 
             coords.append((x + x_i, y + y_i))
 
-    return coords
+    return list(map(tuple, np.asarray(coords)[neighbor_map]))
 
 def get_neighborhood_images(
     subimages: List[np.ndarray],
@@ -340,9 +352,10 @@ def get_neighborhood_images(
     subimage_height: int,
     overlap: Optional[float] = 0,
     n_size: Optional[int] = 1,
-    shape: Optional[Tuple[int, int]] = (512, 512)
+    shape: Optional[Tuple[int, int]] = (512, 512),
+    neighborhood: Optional[str] = 'moore'
 ) -> np.ndarray:
-    neighborhood_coords = get_neighborhood(coord, shape, subimage_width, subimage_height, overlap, n_size)
+    neighborhood_coords = get_neighborhood(coord, shape, subimage_width, subimage_height, overlap, n_size, neighborhood)
     neighborhood_ids = [
         coord_to_id(coord_, shape, subimage_width, subimage_height, overlap) for coord_ in neighborhood_coords
     ]

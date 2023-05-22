@@ -45,6 +45,20 @@ def apply_opening(
 
     return bitmask
 
+def apply_closing(
+    bitmask: np.ndarray,
+    size: int
+) -> np.ndarray:
+    # Check that the structuring element has a size
+    if size == 0:
+        return bitmask
+
+    # Construct the kernel, and apply an opening to the bit-mask
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size))
+    bitmask = cv2.morphologyEx(bitmask, cv2.MORPH_CLOSE, kernel)
+
+    return bitmask
+
 def get_intensity_spectrum(
     sample: np.ndarray,
     n_thresholds: int,

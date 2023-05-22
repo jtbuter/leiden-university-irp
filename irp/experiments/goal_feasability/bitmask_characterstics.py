@@ -17,7 +17,8 @@ id_to_loc_map = [
 train_name = 'case10_10.png'
 test_name = 'case10_11.png'
 subimage_width, subimage_height = 16, 8
-overlap = 0.875
+overlap = 0.75
+n_size = 0
 
 # Get all the subimages
 train_Xs, train_ys = np.asarray(
@@ -35,12 +36,14 @@ test_Xs, test_ys = np.asarray(
 # train_Xs = train_Xs[ids]
 # train_ys = train_ys[ids]
 
-coord = (288, 224)
+coord = (272, 176)
 
 idx = irp.utils.coord_to_id(coord, (512, 512), subimage_width, subimage_height, overlap)
 train_Xs, train_ys = irp.utils.get_neighborhood_images(
-    train_Xs, train_ys, idx, subimage_width, subimage_height, overlap, n_size=1
+    train_Xs, train_ys, idx, subimage_width, subimage_height, overlap, n_size=n_size, neighborhood='neumann'
 )
+
+print(len(train_Xs))
 
 # irp.utils.show(train_ys[4])
 
@@ -55,27 +58,32 @@ for t, (sample, label) in enumerate(zip(train_Xs, train_ys)):
 
     for i, ti in enumerate(envs.utils.get_intensity_spectrum(sample, n_thresholds, add_minus=False)[:-1]):
         bitmask = envs.utils.apply_threshold(sample, ti)
+        # bitmask = envs.utils.apply_opening(bitmask, 1)
         a, c, no = UltraSoundEnv.observation(bitmask)
 
         print(a, c, no)
 
         observations.append((a, c, no))
 
-    ax.scatter(*zip(*observations), label=f'{id_to_loc_map[t]}', depthshade=False, s=50)
+    ax.scatter(*zip(*observations), label=f'{t}', depthshade=False, s=40)
 
-sample = test_Xs[721]
+idx = irp.utils.coord_to_id(coord, (512, 512), subimage_width, subimage_height, 0)
+sample = test_Xs[idx]
 
 observations = []
 
+print(t+1)
+
 for i, ti in enumerate(envs.utils.get_intensity_spectrum(sample, n_thresholds, add_minus=False)[:-1]):
     bitmask = envs.utils.apply_threshold(sample, ti)
+    # bitmask = envs.utils.apply_opening(bitmask, 1)
     a, c, no = UltraSoundEnv.observation(bitmask)
 
     print(a, c, no)
 
     observations.append((a, c, no))
 
-ax.scatter(*zip(*observations), label='Test', depthshade=False, s=50)
+ax.scatter(*zip(*observations), label='Test', depthshade=False, s=80)
 
 ax.set_xlabel('area')
 ax.set_ylabel('compactness')
