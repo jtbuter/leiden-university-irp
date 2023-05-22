@@ -22,17 +22,22 @@
             <div style="position:relative">
                 <img src="../data/trus/labels/case10_10.png" alt="" id="shower">
                 <div style="width: 512px; height: 512px; position:absolute; display: flex; flex-wrap: wrap; top:0; left:0;" id="gridder" width="512" height="512">
+                    
                 </div>
             </div>
             <div>
                 <input type="text" id="name" value="case10_10" tabindex="1">
                 <input type="text" id="dims" value="16 8" autofocus tabindex="2"><br>
                 <input type="text" id="idx">
-                <input type="text" id="coordx">
+                <input type="text" id="coordx"><br>
+                <input type="text" id="n_size" value="0" placeholder="n_size">
+                <input type="text" id="overlap" value="0" placeholder="overlap">
             </div>
         </div>
         <script>
             var elX = 0;
+            var n_size = 0;
+            var overlap = 0;
 
             function sleep(ms) {
                 return new Promise(resolve => setTimeout(resolve, ms));
@@ -72,12 +77,26 @@
                     for (var i = 0; i < (512 / width) * (512 / height); i++) {
                         var div = document.createElement('div');
                         div.id = 'subimg' + i
+                        div.className = 'subimg'
                         div.style.width = width + 'px'
                         div.style.height = height + 'px'
                         div.style.display = 'inline-block'
                         div.style.flexShrink = '0'
                         div.style.verticalAlign = 'top'
-                        // div.style.backgroundColor = 'blue';
+                        div.style.position = 'relative';
+
+                        var border_child = document.createElement('div');
+
+                        border_child.style.top = '0px'
+                        border_child.style.left = '0px';
+                        border_child.style.position = 'absolute';
+                        border_child.style.width = '100%';
+                        border_child.style.height = '100%';
+                        border_child.style.backgroundColor = 'grey';
+                        border_child.style.zIndex = '-1';
+                        border_child.style.pointerEvents = 'none';
+
+                        div.appendChild(border_child);
 
                         div.addEventListener('mouseover', (e) => {
                             document.querySelector('#idx').value = e.target.id.replace('subimg', '');
@@ -123,9 +142,59 @@
                 }
             });
             
+            document.querySelector("#n_size").addEventListener("keydown", e => {
+                if (e.keyCode != 13) return;
+                
+                n_size = e.target.value
+                var side_size = n_size * width * (1 - overlap);
+                var peak_size = n_size * height * (1 - overlap);
+
+                var style = `
+                    #gridder > div:hover > div, #gridder > .hovering > div {
+                        border-top: ${peak_size}px solid rgb(255, 255, 255, 0.5);
+                        border-bottom: ${peak_size}px solid rgb(255, 255, 255, 0.5);
+                        border-left: ${side_size}px solid rgb(255, 255, 255, 0.5);
+                        border-right: ${side_size}px solid rgb(255, 255, 255, 0.5);
+                        margin-top: -${peak_size}px;
+                        margin-bottom: -${peak_size}px;
+                        margin-left: -${side_size}px;
+                        margin-right: -${side_size}px;
+                    }
+                `
+
+                var styleSheet = document.createElement("style")
+                styleSheet.innerText = style
+                document.head.appendChild(styleSheet)
+            });
+            
+            document.querySelector("#overlap").addEventListener("keydown", e => {
+                if (e.keyCode != 13) return;
+                
+                overlap = e.target.value
+                var side_size = n_size * width * (1 - overlap);
+                var peak_size = n_size * height * (1 - overlap);
+
+                var style = `
+                    #gridder > div:hover > div, #gridder > .hovering > div {
+                        border-top: ${peak_size}px solid rgb(255, 255, 255, 0.5);
+                        border-bottom: ${peak_size}px solid rgb(255, 255, 255, 0.5);
+                        border-left: ${side_size}px solid rgb(255, 255, 255, 0.5);
+                        border-right: ${side_size}px solid rgb(255, 255, 255, 0.5);
+                        margin-top: -${peak_size}px;
+                        margin-bottom: -${peak_size}px;
+                        margin-left: -${side_size}px;
+                        margin-right: -${side_size}px;
+                    }
+                `
+
+                var styleSheet = document.createElement("style")
+                styleSheet.innerText = style
+                document.head.appendChild(styleSheet)
+            });
+
             document.querySelector("#coordx").addEventListener('keydown', e => {
                 if (e.keyCode != 13) return;
-
+                
                 if (elX) {
                     elX.classList.remove('hovering');
                 }
@@ -135,8 +204,6 @@
                 
                 if (elX) {
                     elX.classList.add('hovering');
-
-                    console.log(elX);
                 }
             });
 
