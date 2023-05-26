@@ -23,7 +23,7 @@ class Env(gym.Env):
         self._d_sim, (self._th,) = irp.utils.get_best_dissimilarity(sample, label, [self._intensity_spectrum], [envs.utils.apply_threshold], return_seq=True)
 
     def step(self, action: int):
-        # Did we reach the terminal state already
+        # Didn't reach the terminal state yet
         if not np.isinf(self.steps):
             # Update the threshold index
             self.ti = min(max(0, self.ti + self.action_mapping[action]), self.n_thresholds - 1)

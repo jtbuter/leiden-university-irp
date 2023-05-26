@@ -1,3 +1,4 @@
+import gym
 import irp.experiments.tile_coding.env as env
 import irp.experiments.tile_coding.q as q
 import irp.envs as envs
@@ -31,12 +32,15 @@ def make_environment(Xs, ys, parameters):
 
     for subimage, sublabel in zip(Xs, ys):
         environment = env.Env(subimage, sublabel, parameters['n_thresholds'])
+        environment = gym.wrappers.TimeLimit(environment, parameters['n_thresholds'] + 5)
         environment = wrappers.Tiled(
             environment,
             tiles_per_dim=parameters['tiles_per_dim'],
             tilings=parameters['tilings'],
             limits=parameters['limits']
         )
+
+        environments.add(environment)
 
     return environments
 
@@ -48,11 +52,18 @@ parameters = {
     'subimage_height': 8,
     'overlap': 0.0,
     'n_thresholds': 5,
-    'n_size': 1,
+    'n_size': 0,
     'neighborhood': 'neumann',
-    'tiles_per_dim': (2, 2, 2),
-    'tilings': 16,
-    'limits': [(0, 1), (0, 1), (0, 32)]
+    'tiles_per_dim': (4, 4, 4),
+    'tilings': 32,
+    'limits': [(0, 1), (0, 1), (0, 32)],
+    'learning_delay': 0,  # Delay until epsilon starts updating
+    'episodes': 2000,       # Total number of episodes
+    'alpha': 0.6,           # Learning rate
+    'gamma': 0.9,           # Discount factor
+    'epsilon': 1.0,         # Amount of randomness in the action selection
+    'epsilon_decay': 0.001, # Fixed amount to decrease
+    'min_epsilon': 0.05,
 }
 
 # Load the training and testing subimage
@@ -65,5 +76,7 @@ nh_Xs, nh_ys = filter_data(train_Xs, train_ys, coordinate, parameters)
 # Set-up the MultiSample environment
 environments = make_environment(nh_Xs, nh_ys, parameters)
 
-q.learn(environments, log=True)
+parameters['hash_size'] = environments.T.n_tiles
+
+q.learn(environments, parameters, log=True)
 
