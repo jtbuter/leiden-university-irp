@@ -33,11 +33,13 @@
                 <input type="text" id="n_size" value="0">
                 <input type="text" id="overlap" value="0">
             </div>
+            <button id="change_img">Swap source</button>
         </div>
         <script>
             var elX = 0;
             var n_size = 0;
             var overlap = 0;
+            var sourcetype = 'labels'
 
             function sleep(ms) {
                 return new Promise(resolve => setTimeout(resolve, ms));
@@ -195,6 +197,9 @@
             document.querySelector("#coordx").addEventListener('keydown', e => {
                 if (e.keyCode != 13) return;
 
+                if (elX) {
+                    elX.classList.remove('hovering')
+                }
 
                 var id = e.target.value;
                 elX = document.querySelector('[coord-xy="' + e.target.value + '"]');
@@ -219,8 +224,22 @@
             document.querySelector("#name").addEventListener("input", (e) => {
                 // document.querySelector('#idx').textContent = '';
 
-                img_name = "../data/trus/labels/" + e.target.value + '.png';
+                img_name = "../data/trus/" + sourcetype + "/" + e.target.value + '.png';
 
+                if (imageExists(img_name)) {
+                    document.querySelector("#shower").src = img_name
+                }
+            })
+            
+            document.querySelector("#change_img").addEventListener("click", (e) => {
+                if (sourcetype == "labels") {
+                    sourcetype = "images"
+                } else {
+                    sourcetype = "labels"
+                }
+
+                img_name = "../data/trus/" + sourcetype + "/" + document.querySelector("#name").value + '.png';
+    
                 if (imageExists(img_name)) {
                     document.querySelector("#shower").src = img_name
                 }

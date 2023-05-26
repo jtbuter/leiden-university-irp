@@ -1,9 +1,13 @@
 from __future__ import annotations
 import os
+import itertools
 import typing
 from typing import Union, Optional, Callable, Dict, Any, Tuple, List
 import irp
 
+import diplib as dip
+
+import copy
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,30 +18,13 @@ from gym.wrappers import TimeLimit
 
 from scipy.ndimage import median_filter
 
+import sklearn.metrics
+
 import irp.wrappers.discretize
 import irp.envs as envs
 
 if typing.TYPE_CHECKING:
     from irp.q import Q
-
-def apply_threshold(sample, *tis):
-    if len(tis) == 1:
-        bit_mask = cv2.threshold(sample, int(tis[0]), 255, cv2.THRESH_BINARY_INV)[1]
-    else:
-        bit_mask = cv2.inRange(sample, int(tis[0]), int(tis[1]))
-
-    return bit_mask
-
-def apply_morphology(bit_mask, size):
-    # Check that the structuring element has a size
-    if size == 0:
-        return bit_mask
-
-    # Apply an opening to the bit-mask
-    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size))
-    bit_mask = cv2.morphologyEx(bit_mask, cv2.MORPH_OPEN, kernel)
-
-    return bit_mask
 
 def process_thresholds(action, action_map, tis, n_thresholds):
     return np.clip(tis + action_map[action], 0, n_thresholds - 1)
@@ -51,6 +38,9 @@ def read_image(path):
     return cv2.imread(path, cv2.IMREAD_GRAYSCALE)
 
 def extract_subimages(image, subimage_width, subimage_height, overlap=0):
+    if isinstance(image, tuple):
+        image = np.zeros(image)
+
     height, width = image.shape
     subimages, coords = [], []
 
@@ -123,7 +113,7 @@ def discrete(sample, grid) -> Tuple[int, ...]:
     # return tuple(int(np.digitize(s, g)) for s, g in zip(sample, grid))
     return tuple(int(np.searchsorted(g, s)) for s, g in zip(sample, grid))
 
-def make_sample_label(*file_names, idx=184, width=32, height=16, overlap=0):
+def make_sample_label(*file_names, idx=184, width=32, height=16, overlap=0, ellipse=[1,1]):
     base_path = os.path.join(irp.ROOT_DIR, "../../data/trus/")
     image_path = os.path.join(base_path, 'images')
     label_path = os.path.join(base_path, 'labels')
@@ -132,7 +122,7 @@ def make_sample_label(*file_names, idx=184, width=32, height=16, overlap=0):
     
     for file_name in file_names:
         image = read_image(os.path.join(image_path, file_name))
-        image = median_filter(image, 15)
+        image = median_filter(image, 17)
         label = read_image(os.path.join(label_path, file_name))
 
         subimages, coords = extract_subimages(image, width, height, overlap)
@@ -148,7 +138,7 @@ def make_sample_label(*file_names, idx=184, width=32, height=16, overlap=0):
             images.append(subimage)
             labels.append(sublabel)
     
-    return list(zip(images, labels))
+    return np.asarray(list(zip(images, labels)))
 
 def str_to_builtin(value: str, builtin: str = None):
     # TODO: It's safer to use this way of casting variables, but for now use
@@ -329,9 +319,11 @@ def get_neighborhood(
     x, y = coord
     coords = []
 
-    if neighborhood == 'neumann':
+    if isinstance(neighborhood, np.ndarray):
+        neighbor_map = neighborhood.flatten()
+    elif neighborhood == 'neumann':
         neighbor_map = diamond(n_size * 2 + 1).flatten()
-    else:
+    elif neighborhood == 'moore':
         neighbor_map = np.ones((n_size * 2 + 1, n_size * 2 + 1), dtype=bool).flatten()
 
     for y_i in range(-n_size, n_size + 1):
@@ -353,29 +345,50 @@ def get_neighborhood_images(
     overlap: Optional[float] = 0,
     n_size: Optional[int] = 1,
     shape: Optional[Tuple[int, int]] = (512, 512),
-    neighborhood: Optional[str] = 'moore'
+    neighborhood: Optional[Union[str, np.ndarray]] = 'moore'
 ) -> np.ndarray:
     neighborhood_coords = get_neighborhood(coord, shape, subimage_width, subimage_height, overlap, n_size, neighborhood)
+
     neighborhood_ids = [
         coord_to_id(coord_, shape, subimage_width, subimage_height, overlap) for coord_ in neighborhood_coords
     ]
 
     return np.asarray([subimages[i] for i in neighborhood_ids]), np.asarray([sublabels[i] for i in neighborhood_ids])
 
-def get_best_dissimilarity(subimage, sublabel, ths: np.ndarray, return_th = False) -> Union[float, Tuple[float, int]]:
+def get_best_dissimilarity(
+    subimage,
+    sublabel,
+    actions: List[Union[int, str]],
+    fns: List[Callable],
+    return_seq = False
+) -> Union[float, Tuple[float, int]]:
     best_dissim = np.inf
-    best_th = -1
+    best_sequence = None
 
-    for th in ths:
-        bitmask = envs.utils.apply_threshold(subimage, int(th))
+    for sequence in itertools.product(*actions):
+        fn, action = fns[0], sequence[0]
+
+        if not isinstance(action, tuple):
+            action = [action]
+
+        bitmask = fn(subimage, *action)
+
+        for i in range(1, len(fns)):
+            fn, action = fns[i], sequence[i] 
+
+            if not isinstance(action, tuple):
+                action = [action]
+
+            bitmask = fn(bitmask, *action)
+
         dissim = envs.utils.compute_dissimilarity(bitmask, sublabel)
 
         if dissim < best_dissim:
             best_dissim = dissim
-            best_th = th
+            best_sequence = sequence
 
-    if return_th:
-        return float(best_dissim), best_th
+    if return_seq:
+        return float(best_dissim), best_sequence
 
     return float(best_dissim)
 
@@ -394,3 +407,46 @@ def area_of_overlap(
         return 0.0
 
     return tp / (tp + fn)
+
+def precision(
+    label: np.ndarray,
+    bitmask: np.ndarray
+) -> float:
+    tp = ((label == 255) & (bitmask == 255)).sum()
+    fp = ((bitmask == 255) & (label != bitmask)).sum()
+
+    if tp + fp == 0:
+        return 0.0
+
+    return tp / (tp + fp)
+
+def f1(
+    label: np.ndarray,
+    bitmask: np.ndarray
+) -> float:
+    label = (label / 255).astype(int)
+    bitmask = (bitmask / 255).astype(int)
+
+    return sklearn.metrics.f1_score(label.flatten(), bitmask.flatten())
+
+def jaccard(
+    label: np.ndarray,
+    bitmask: np.ndarray
+) -> float:
+    intersection = np.logical_and(label, bitmask)
+    union = np.logical_or(label, bitmask)
+
+    return np.sum(intersection) / np.sum(union)
+
+def dice(
+    label: np.ndarray,
+    bitmask: np.ndarray
+) -> float:
+    tp = ((label == 255) & (bitmask == 255)).sum()
+    fp = ((bitmask == 255) & (label != bitmask)).sum()
+    fn = ((bitmask == 0) & (label != bitmask)).sum()
+
+    return (2 * tp) / (2 * tp + fp + fn)
+    # union = 
+
+    # return (2 * (label & bitmask) / ((label > 0).sum() + (bitmask > 0).sum())

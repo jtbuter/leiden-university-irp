@@ -19,13 +19,19 @@ def apply_threshold(
     ti_left = int(ti_left)
 
     # We can't make this threshold using opencv
-    if ti_left < 0:
+    if ti_left < 0 and ti_right is None:
         return np.zeros_like(sample)
 
     # Only use a single cut-off value
     if ti_right is None:
         bitmask = cv2.threshold(sample, ti_left, 255, cv2.THRESH_BINARY_INV)[1]
     else:
+        # We can't make this threshold using opencv
+        if ti_left < 0 and ti_right < 0:
+            return np.zeros_like(sample)
+        else:
+            ti_left = 0
+
         ti_right = int(ti_right)
         bitmask = cv2.inRange(sample, ti_left, ti_right)
 
@@ -65,9 +71,9 @@ def get_intensity_spectrum(
     add_minus: Optional[bool] = False
 ) -> np.ndarray:
     minimum, maximum = np.min(sample), np.max(sample)
-    intensity_spectrum = np.linspace(minimum, maximum, n_thresholds, dtype=np.uint64)
+    intensity_spectrum = np.linspace(minimum, maximum, n_thresholds, dtype=np.int64)
 
-    if not add_minus:
+    if add_minus is False:
         return intensity_spectrum
 
     return np.insert(intensity_spectrum, 0, -1.0)
