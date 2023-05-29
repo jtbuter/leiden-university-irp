@@ -8,7 +8,7 @@ from irp.envs.ultrasound.ultra_sound_env import UltraSoundEnv
 
 class Env(gym.Env):
     # Defines how thresholds can be modified
-    action_mapping = [1, 0, -1]
+    action_mapping = [-1, 1, 0]
 
     def __init__(self, sample: np.ndarray, label: np.ndarray, n_thresholds: int):
         self.sample = sample
@@ -41,7 +41,7 @@ class Env(gym.Env):
         if done:
             reward = 1
         else:
-            reward = 0
+            reward = -1
 
         return UltraSoundEnv.observation(self.bitmask), reward, done, {'d_sim': d_sim}
 
