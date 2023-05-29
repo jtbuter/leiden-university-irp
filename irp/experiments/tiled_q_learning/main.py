@@ -18,7 +18,7 @@ def evaluate(environment: Tiled, policy: TiledQ, steps: int = 10, ti: Optional[i
         action = policy.predict(state)
         state, reward, done, info = environment.step(action)
 
-    return info['d_sim']
+    return info['d_sim'] 
 
 s_width, s_height, overlap, n_size = 16, 8, 0, 1 # Define characteristics for the training and testing samples
 subimages, sublabels = irp.utils.get_subimages('case10_10.png', s_width, s_height, overlap) # Get all training instances
