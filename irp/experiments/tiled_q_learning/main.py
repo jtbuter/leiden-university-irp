@@ -1,6 +1,8 @@
+import os
 from typing import Optional
 import matplotlib.pyplot as plt
 import numpy as np
+import sklearn.metrics
 
 from irp.experiments.tile_coding.env import Env
 from irp.policies.tiled_q_table import TiledQ
@@ -8,9 +10,11 @@ from irp.experiments.tiled_q_learning.encoder import Tiled
 import irp.wrappers as wrappers
 import irp.envs as envs
 import irp.utils
+import irp
 
 def evaluate(environment: Tiled, policy: TiledQ, steps: int = 10, ti: Optional[int] = None):
-    ti = (environment.n_thresholds - 1) * (np.random.random() > 0.5)
+    if ti is None:
+        ti = (environment.n_thresholds - 1) * (np.random.random() > 0.5)
 
     state = environment.reset(ti=ti)
 
@@ -18,74 +22,75 @@ def evaluate(environment: Tiled, policy: TiledQ, steps: int = 10, ti: Optional[i
         action = policy.predict(state)
         state, reward, done, info = environment.step(action)
 
-    return info['d_sim'] 
+    return info['d_sim']
+
+real = irp.utils.read_image(os.path.join(irp.GIT_DIR, '../data/trus/labels/case10_11.png'))
 
 s_width, s_height, overlap, n_size = 16, 8, 0, 1 # Define characteristics for the training and testing samples
 subimages, sublabels = irp.utils.get_subimages('case10_10.png', s_width, s_height, overlap) # Get all training instances
-sample, label = subimages[1134], sublabels[1134] # Get a specific training instance
-
-test_subimages, test_sublabels = irp.utils.get_subimages('case10_11.png', s_width, s_height, overlap) # Get all training instances
-test_sample, test_label = test_subimages[1134], test_sublabels[1134] # Get a specific training instance
-
-n_thresholds, tiles_per_dim, tilings, limits = 4, (2, 2, 2), 64, [(0, 1), (0, 1), (0, 32)]
-environment = Env(sample, label, n_thresholds=n_thresholds)
-environment = Tiled(environment, tiles_per_dim, tilings, limits)
-
-test_environment = Env(test_sample, test_label, n_thresholds=n_thresholds)
-test_environment = Tiled(test_environment, tiles_per_dim, tilings, limits)
-
+t_subimages, t_sublabels = irp.utils.get_subimages('case10_11.png', s_width, s_height, overlap) # Get all training instances
+n_thresholds, tiles_per_dim, tilings, limits = 4, (2, 2, 2), 64, [(0, 1), (0, 1), (0, 32)] # Characteristics for tile-coding
 alpha = 0.2
 gamma = 0.95
-
-t = 0
-ep = 1
 ep_frac = 0.999
 ep_min = 0.3
 
-policy = TiledQ(environment.T.n_tiles, environment.action_space.n, alpha)
-exploitation = None
-d_sims = []
+coords = irp.utils.extract_subimages(np.zeros((512, 512)), s_width, s_height, overlap)[1]
 
-while t < 5000: # Perform `n` total timesteps
-    state = environment.reset()
+result = np.zeros((512, 512))
+failed = []
 
-    for _ in range(15): # Perform 10 timesteps
+for coord in coords:
+    x, y = coord
+    index = irp.utils.coord_to_id(coord, (512, 512), s_width, s_height, overlap)
+
+    if not (x >= 192 and x <= 336 and y >= 176 and y <= 288):
+        continue
+
+    sample, label = subimages[index], sublabels[index]
+    environment = Env(sample, label, n_thresholds=n_thresholds)
+    environment = Tiled(environment, tiles_per_dim, tilings, limits)
+    
+    policy = TiledQ(environment.T.n_tiles, environment.action_space.n, alpha)
+    
+    t = 0
+    ep = 1
+
+    while t < 5000: # Perform `n` total timesteps
+        state = environment.reset()
         if np.random.random() < ep: action = environment.action_space.sample()
         else: action = policy.predict(state)
 
-        next_state, reward, done, info = environment.step(action)
-        target = reward + gamma * max(policy.values(next_state))
 
-        policy.update(state, action, target)
+        for _ in range(15): # Perform 15 timesteps
+            next_state, reward, done, info = environment.step(action)
+            next_action = policy.predict(next_state)
+            target = reward + gamma * policy.value(next_state, next_action)
 
-        state = next_state
+            policy.update(state, action, target)
 
-        t += 1
+            state = next_state
+            action = next_action
 
-        ep = max(ep_min, ep * ep_frac)
+            t += 1
 
-        if exploitation is None and ep == ep_min:
-            exploitation = t
+            ep = max(ep_min, ep * ep_frac)
 
-    d_sims.append((t, evaluate(test_environment, policy)))
+    t_sample, t_label = t_subimages[index], t_sublabels[index]
+    t_environment = Env(t_sample, t_label, n_thresholds=n_thresholds)
+    t_environment = Tiled(t_environment, tiles_per_dim, tilings, limits)
 
-xs, ys = list(zip(*d_sims))
+    d_sim = evaluate(t_environment, policy, ti=0)
 
-n = 30
+    print(coord, d_sim, t_environment.d_sim)
 
-plt.plot(xs, np.convolve(ys, np.ones(n) / n, 'same'), label='Dissimilarity')
-plt.axhline(test_environment.d_sim, linestyle='-', color='black', label='Optimality')
-if exploitation is not None:
-    plt.axvline(exploitation, linestyle='--', color='grey')
-plt.legend()
+    if not np.isclose(d_sim, t_environment.d_sim):
+        failed.append(coord)
+
+    result[y:y+s_height, x:x+s_width] = t_environment.bitmask
+
+print(failed)
+print(sklearn.metrics.f1_score((real / 255).astype(bool).flatten(), (result / 255).astype(bool).flatten()))
+
+plt.imshow(result, cmap='gray', vmin=0, vmax=1)
 plt.show()
-
-# print(test_environment.intensity_spectrum)
-
-# state = test_environment.reset(ti=4)
-
-# for i in range(10):
-#     action = policy.predict(state)
-#     state, reward, done, info = test_environment.step(action)
-
-#     print(action, info['d_sim'], done)
