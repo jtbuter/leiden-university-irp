@@ -21,7 +21,7 @@ class Env(gym.Env):
         
         self.n_thresholds = n_thresholds + 1
 
-        self._d_sim = irp.utils.get_best_dissimilarity(sample, label, self._intensity_spectrum)
+        self._d_sim = irp.utils.get_best_dissimilarity(sample, label, [self._intensity_spectrum], [envs.utils.apply_threshold])
 
     def step(self, action: int):
         # Update the threshold index
