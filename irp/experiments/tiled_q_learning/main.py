@@ -35,9 +35,18 @@ gamma = 0.95
 ep_frac = 0.999
 ep_min = 0.3
 
-coords = irp.utils.extract_subimages(np.zeros((512, 512)), s_width, s_height, overlap)[1]
+coords = [
+    (256, 176), (288, 176), (240, 184), (256, 184), (224, 192), (240, 192), (304, 192),
+    (224, 200), (240, 200), (304, 200), (320, 200), (224, 208), (240, 208), (304, 208),
+    (320, 208), (208, 216), (240, 216), (208, 224), (336, 224), (208, 232), (192, 240),
+    (336, 240), (192, 248), (272, 248), (304, 248), (208, 264), (256, 264), (272, 264),
+    (208, 272), (224, 272), (240, 272), (256, 272), (288, 272), (240, 280), (288, 280),
+    (304, 280), (304, 288), (320, 288)
+]
 
 result = np.zeros((512, 512))
+real = np.zeros((512, 512))
+
 failed = []
 
 for coord in coords:
@@ -88,9 +97,10 @@ for coord in coords:
         failed.append(coord)
 
     result[y:y+s_height, x:x+s_width] = t_environment.bitmask
+    real[y:y+s_height, x:x+s_width] = t_environment.label
 
 print(failed)
 print(sklearn.metrics.f1_score((real / 255).astype(bool).flatten(), (result / 255).astype(bool).flatten()))
 
-plt.imshow(result, cmap='gray', vmin=0, vmax=1)
+plt.imshow(np.hstack([real, result]), cmap='gray', vmin=0, vmax=1)
 plt.show()
