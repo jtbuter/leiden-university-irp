@@ -34,7 +34,18 @@ def compute_dissimilarity(bit_mask, label):
 
     return np.sum(np.logical_xor(bit_mask, label)) / (height * width)
 
-def read_image(path):
+def read_image(path, add_root: Optional[bool] = False):
+    if add_root:
+        # Define the paths to the related parent directories
+        base_path = os.path.join(irp.GIT_DIR, "../data/trus/")
+        image_path = os.path.join(base_path, 'images')
+        label_path = os.path.join(base_path, 'labels')
+        # Read the image and label
+        image_path = os.path.join(image_path, path)
+        label_path = os.path.join(label_path, path)
+        
+        return cv2.imread(image_path, cv2.IMREAD_GRAYSCALE), cv2.imread(label_path, cv2.IMREAD_GRAYSCALE)
+
     return cv2.imread(path, cv2.IMREAD_GRAYSCALE)
 
 def extract_subimages(image, subimage_width, subimage_height, overlap=0):
@@ -122,7 +133,7 @@ def make_sample_label(*file_names, idx=184, width=32, height=16, overlap=0, elli
     
     for file_name in file_names:
         image = read_image(os.path.join(image_path, file_name))
-        image = median_filter(image, 17)
+        image = median_filter(image, 15)
         label = read_image(os.path.join(label_path, file_name))
 
         subimages, coords = extract_subimages(image, width, height, overlap)
@@ -367,9 +378,12 @@ def get_best_dissimilarity(
 
     for sequence in itertools.product(*actions):
         fn, action = fns[0], sequence[0]
+        actions_ = []
 
         if not isinstance(action, tuple):
             action = [action]
+
+        actions_.append(action)
 
         bitmask = fn(subimage, *action)
 
@@ -378,6 +392,8 @@ def get_best_dissimilarity(
 
             if not isinstance(action, tuple):
                 action = [action]
+            
+            actions_.append(action)
 
             bitmask = fn(bitmask, *action)
 
@@ -385,7 +401,7 @@ def get_best_dissimilarity(
 
         if dissim < best_dissim:
             best_dissim = dissim
-            best_sequence = sequence
+            best_sequence = actions_
 
     if return_seq:
         return float(best_dissim), best_sequence
