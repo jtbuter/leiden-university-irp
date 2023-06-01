@@ -122,7 +122,7 @@ def make_sample_label(*file_names, idx=184, width=32, height=16, overlap=0, elli
     
     for file_name in file_names:
         image = read_image(os.path.join(image_path, file_name))
-        image = median_filter(image, 17)
+        image = median_filter(image, 15)
         label = read_image(os.path.join(label_path, file_name))
 
         subimages, coords = extract_subimages(image, width, height, overlap)

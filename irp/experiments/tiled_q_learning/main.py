@@ -1,5 +1,6 @@
 import os
 from typing import Optional
+from gym.wrappers.time_limit import TimeLimit
 import matplotlib.pyplot as plt
 import numpy as np
 import sklearn.metrics
@@ -28,7 +29,7 @@ def evaluate(environment: Tiled, policy: TiledQ, steps: int = 10, ti: Optional[i
     return info['d_sim']
 
 
-train, test = 11, 12
+train, test = 10, 11
 
 real = irp.utils.read_image(os.path.join(irp.GIT_DIR, f'../data/trus/labels/case10_{test}.png'))
 s_width, s_height, overlap, n_size = 16, 8, 0, 0 # Define characteristics for the training and testing samples
@@ -48,6 +49,8 @@ failed = []
 train_d_sims = []
 eval_d_sims = []
 exploit = 0
+max_e = 5000
+max_t = 5000
 
 for coord in coords:
     x, y = coord
@@ -65,40 +68,44 @@ for coord in coords:
 
     for sample, label in zip(samples, labels):
         environment = Env(sample, label, n_thresholds=n_thresholds)
+        environment = TimeLimit(environment, 30)
         environment = Tiled(environment, tiles_per_dim, tilings, limits)
+
         environments.add(environment)
 
     environment = environments
     
     policy = TiledQ(environment.T.n_tiles, environment.action_space.n, alpha)
     
-    t = 0
+    t, e = 0, 0
     ep = 1
 
-    while t < 5000: # Perform `n` total timesteps
-        state = environment.reset()
-        if np.random.random() < ep: action = environment.action_space.sample()
-        else: action = policy.predict(state)
+    state = environment.reset()
 
-        for _ in range(30): # Perform `k` timesteps
-            next_state, reward, done, info = environment.step(action)
-            next_action = policy.predict(next_state)
-            target = reward + gamma * policy.value(next_state, next_action)
+    if np.random.random() < ep: action = environment.action_space.sample()
+    else: action = policy.predict(state)
 
-            policy.update(state, action, target)
+    while e < max_e and t < max_t: # Perform `n` total timesteps
+        next_state, reward, done, info = environment.step(action)
+        next_action = policy.predict(next_state)
+        target = reward + gamma * policy.value(next_state, next_action)
 
-            state = next_state
-            action = next_action
+        policy.update(state, action, target)
 
-            t += 1
+        state = next_state
+        action = next_action
 
-            ep = max(ep_min, ep - ep_frac)
+        t += 1
 
-            if exploit <= 0 and ep == ep_min:
-                exploit = t
+        ep = max(ep_min, ep - ep_frac)
 
-        # train_d_sims.append(evaluate(environment, policy, return_done=True))
-        # eval_d_sims.append(evaluate(t_environment, policy, ti=0))
+        if done:
+            state = environment.reset()
+
+            if np.random.random() < ep: action = environment.action_space.sample()
+            else: action = policy.predict(state)
+    
+            e += 1
 
     d_sim = evaluate(t_environment, policy, ti=0)
 
@@ -108,6 +115,8 @@ for coord in coords:
         failed.append(coord)
 
     result[y:y+s_height, x:x+s_width] = t_environment.bitmask
+
+    print(f"Episodes: {e} / {max_e}, timesteps: {t} / {max_t}")
 
 # plt.plot(np.convolve(train_d_sims, np.ones(10) / 10, mode='same'), label='train')
 # plt.plot(np.convolve(eval_d_sims, np.ones(10) / 10, mode='same'), label='eval')
@@ -120,7 +129,7 @@ for coord in coords:
 
 # print(failed)
 # print(round(1 - (len(failed) / len(coords)), 2), len(failed), len(coords))
-print(sklearn.metrics.f1_score((real / 255).astype(bool).flatten(), (result / 255).astype(bool).flatten()))
+print(sklearn.metrics.f1_score(real.astype(bool).flatten(), result.astype(bool).flatten()))
 
 plt.imshow(np.hstack([real, result]), cmap='gray', vmin=0, vmax=1)
 plt.show()

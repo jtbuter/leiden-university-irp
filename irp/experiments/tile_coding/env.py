@@ -43,7 +43,7 @@ class Env(gym.Env):
         else:
             reward = -1
 
-        return UltraSoundEnv.observation(self.bitmask), reward, done, {'d_sim': d_sim}
+        return UltraSoundEnv.observation(self.bitmask), reward, False, {'d_sim': d_sim}
 
     def reset(self, ti: Optional[int] = None):
         # Pick random threshold intensity, or use the one specified by the user
