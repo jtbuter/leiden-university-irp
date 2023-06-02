@@ -21,8 +21,8 @@ class MultiSample(gym.Wrapper):
             self._order = np.random.choice(range(len(envs)), len(envs), replace=False)
 
         # self._env_id = np.random.randint(len(envs))
-        # self._env_id = math.floor(random.random() * len(envs))
-        self._env_id = (self._env_id + 1) % len(envs)
+        self._env_id = math.floor(random.random() * len(envs))
+        # self._env_id = (self._env_id + 1) % len(envs)
         self.env = envs[self._order[self._env_id]]
 
         return super().reset(**kwargs)
@@ -33,3 +33,7 @@ class MultiSample(gym.Wrapper):
             super().__init__(env)
 
         self._envs.append(env)
+
+    @property
+    def envs(self):
+        return self._envs

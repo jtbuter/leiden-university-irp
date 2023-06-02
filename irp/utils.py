@@ -1,11 +1,10 @@
 from __future__ import annotations
+from collections import Counter
 import os
 import itertools
 import typing
 from typing import Union, Optional, Callable, Dict, Any, Tuple, List
 import irp
-
-import diplib as dip
 
 import copy
 import cv2
@@ -450,3 +449,10 @@ def dice(
     # union = 
 
     # return (2 * (label & bitmask) / ((label > 0).sum() + (bitmask > 0).sum())
+
+def vote(
+    sequence: List
+):
+    data = Counter(sequence)
+
+    return data.most_common(1)[0][0]

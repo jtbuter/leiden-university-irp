@@ -23,26 +23,25 @@ def evaluate(environment: Tiled, policy: TiledQ, steps: int = 10, ti: Optional[i
         state, reward, done, info = environment.step(action)
 
     if return_done:
-        return done
+        return np.isclose(info['d_sim'], environment.d_sim)
 
     return info['d_sim']
-
 
 train, test = 11, 12
 
 real = irp.utils.read_image(os.path.join(irp.GIT_DIR, f'../data/trus/labels/case10_{test}.png'))
-s_width, s_height, overlap, n_size = 16, 8, 0, 0 # Define characteristics for the training and testing samples
+s_width, s_height, overlap, n_size = 16, 8, 0.75, 1 # Define characteristics for the training and testing samples
 subimages, sublabels = irp.utils.get_subimages(f'case10_{train}.png', s_width, s_height, overlap) # Get all training instances
 t_subimages, t_sublabels = irp.utils.get_subimages(f'case10_{test}.png', s_width, s_height, overlap) # Get all training instances
 n_thresholds, tiles_per_dim, tilings, limits = 4, (2, 2, 2), 64, [(0, 1), (0, 1), (0, 32)] # Characteristics for tile-coding
-alpha = 0.8
-gamma = 0.9
-ep_frac = 0.00025
-ep_max = 0.3
-ep_min = 0.3
+alpha = 0.6
+gamma = 0.6
+ep_frac = 0.001
+ep_max = 0.7
+ep_min = 0.7
 
-coords = irp.utils.extract_subimages(np.zeros((512, 512)), s_width, s_height, overlap)[1]
-# coords = [(288, 272)]
+coords = irp.utils.extract_subimages(np.zeros((512, 512)), s_width, s_height, 0)[1]
+# coords = [(224, 240)]
 
 result = np.zeros((512, 512))
 
@@ -72,7 +71,7 @@ for coord in coords:
         environments.add(environment)
 
     environment = environments
-    
+
     policy = TiledQ(environment.T.n_tiles, environment.action_space.n, alpha)
     
     t = 0
@@ -104,9 +103,10 @@ for coord in coords:
             if exploit <= 0 and ep == ep_min:
                 exploit = t
 
-        # ts.append(t)
-        # train_d_sims.append(evaluate(environment, policy))
-        # eval_d_sims.append(evaluate(t_environment, policy, ti=0))
+        if len(coords) < 10:
+            ts.append(t)
+            train_d_sims.append(evaluate(environment, policy, return_done=True))
+            eval_d_sims.append(evaluate(t_environment, policy, ti=0))
 
     d_sim = evaluate(t_environment, policy, ti=0)
 
@@ -117,21 +117,22 @@ for coord in coords:
 
     result[y:y+s_height, x:x+s_width] = t_environment.bitmask
 
-print(exploit)
+if len(coords) < 10:
+    print(exploit)
 
-# plt.plot(ts, np.convolve(train_d_sims, np.ones(10) / 10, mode='same'), label='train')
-# plt.plot(ts, np.convolve(eval_d_sims, np.ones(10) / 10, mode='same'), label='eval')
-# plt.axhline(t_environment.d_sim, linestyle='--', color='red', label='best test d_sim')
-# plt.axhline(environment.d_sim, linestyle='--', color='orange', label='best train d_sim')
-# plt.axvline(min(exploit, len(train_d_sims)), linestyle='--', color='grey', label='exploitation')
-# # plt.legend()
-# plt.show()
+    plt.plot(ts, np.convolve(train_d_sims, np.ones(10) / 10, mode='same'), label='train')
+    plt.plot(ts, np.convolve(eval_d_sims, np.ones(10) / 10, mode='same'), label='eval')
+    plt.axhline(t_environment.d_sim, linestyle='--', color='red', label='best test d_sim')
+    plt.axhline(environment.d_sim, linestyle='--', color='orange', label='best train d_sim')
+    plt.axvline(exploit, linestyle='--', color='grey', label='exploitation')
+    plt.legend()
+    plt.show()
 
 # irp.utils.show(np.hstack([t_environment.label, t_environment.bitmask]))
 
 # print(failed)
 # print(round(1 - (len(failed) / len(coords)), 2), len(failed), len(coords))
-print(sklearn.metrics.f1_score((real / 255).astype(bool).flatten(), (result / 255).astype(bool).flatten()))
+print(sklearn.metrics.f1_score(real.astype(bool).flatten(), result.astype(bool).flatten()))
 
 plt.imshow(np.hstack([real, result]), cmap='gray', vmin=0, vmax=1)
 plt.show()
