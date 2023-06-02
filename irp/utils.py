@@ -436,7 +436,7 @@ def jaccard(
     intersection = np.logical_and(label, bitmask)
     union = np.logical_or(label, bitmask)
 
-    return np.sum(intersection) / np.sum(union)
+    return intersection.sum() / union.sum()
 
 def dice(
     label: np.ndarray,

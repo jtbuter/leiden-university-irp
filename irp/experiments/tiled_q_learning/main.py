@@ -35,19 +35,21 @@ s_width, s_height, overlap, n_size = 16, 8, 0, 0 # Define characteristics for th
 subimages, sublabels = irp.utils.get_subimages(f'case10_{train}.png', s_width, s_height, overlap) # Get all training instances
 t_subimages, t_sublabels = irp.utils.get_subimages(f'case10_{test}.png', s_width, s_height, overlap) # Get all training instances
 n_thresholds, tiles_per_dim, tilings, limits = 4, (2, 2, 2), 64, [(0, 1), (0, 1), (0, 32)] # Characteristics for tile-coding
-alpha = 0.6
-gamma = 0.95
-ep_frac = 0.005
+alpha = 0.8
+gamma = 0.9
+ep_frac = 0.00025
+ep_max = 0.3
 ep_min = 0.3
 
 coords = irp.utils.extract_subimages(np.zeros((512, 512)), s_width, s_height, overlap)[1]
-coords = [(224, 208)]
+# coords = [(288, 272)]
 
 result = np.zeros((512, 512))
 
 failed = []
 train_d_sims = []
 eval_d_sims = []
+ts = []
 exploit = 0
 
 for coord in coords:
@@ -74,9 +76,9 @@ for coord in coords:
     policy = TiledQ(environment.T.n_tiles, environment.action_space.n, alpha)
     
     t = 0
-    ep = 1.0
+    ep = ep_max
 
-    while t < 5000: # Perform `n` total timesteps
+    while t < 15000: # Perform `n` total timesteps
         state = environment.reset()
         if np.random.random() < ep: action = environment.action_space.sample()
         else: action = policy.predict(state)
@@ -102,7 +104,8 @@ for coord in coords:
             if exploit <= 0 and ep == ep_min:
                 exploit = t
 
-        train_d_sims.append(evaluate(environment, policy))
+        # ts.append(t)
+        # train_d_sims.append(evaluate(environment, policy))
         # eval_d_sims.append(evaluate(t_environment, policy, ti=0))
 
     d_sim = evaluate(t_environment, policy, ti=0)
@@ -116,12 +119,13 @@ for coord in coords:
 
 print(exploit)
 
-plt.plot(np.convolve(train_d_sims, np.ones(10) / 10, mode='same'), label='train')
-# plt.plot(np.convolve(eval_d_sims, np.ones(10) / 10, mode='same'), label='eval')
+# plt.plot(ts, np.convolve(train_d_sims, np.ones(10) / 10, mode='same'), label='train')
+# plt.plot(ts, np.convolve(eval_d_sims, np.ones(10) / 10, mode='same'), label='eval')
 # plt.axhline(t_environment.d_sim, linestyle='--', color='red', label='best test d_sim')
+# plt.axhline(environment.d_sim, linestyle='--', color='orange', label='best train d_sim')
 # plt.axvline(min(exploit, len(train_d_sims)), linestyle='--', color='grey', label='exploitation')
-# plt.legend()
-plt.show()
+# # plt.legend()
+# plt.show()
 
 # irp.utils.show(np.hstack([t_environment.label, t_environment.bitmask]))
 
