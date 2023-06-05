@@ -1,4 +1,4 @@
-from typing import Optional, List
+from typing import Callable, Optional, List
 
 import cv2
 import numpy as np
@@ -54,10 +54,11 @@ def get_intensity_spectrum(
     return np.linspace(minimum, maximum, n_thresholds)
 
 def compute_dissimilarity(
+    label: np.ndarray,
     bitmask: np.ndarray,
-    label: np.ndarray
+    fn: Callable = lambda x, y: (x != y).sum() / y.size
 ) -> float:
-    return (bitmask != label).sum() / label.size
+    return fn(label, bitmask)
 
 def get_contours(
     bitmask: np.ndarray

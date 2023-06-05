@@ -43,7 +43,7 @@ class Tiled(gym.Wrapper):
         return encoded, reward, done, info
 
     def reset(self, **kwargs: Dict) -> np.ndarray:
-        state = self.env.reset(**kwargs)
+        state, info = self.env.reset(**kwargs)
         encoded = self.encode(self._T, state)
 
-        return encoded
+        return encoded, info

@@ -1,248 +1,107 @@
-from __future__ import annotations
-from collections import Counter
-import os
+from typing import Callable, List, Optional, Tuple, Union
+import cv2, os
 import itertools
-import typing
-from typing import Union, Optional, Callable, Dict, Any, Tuple, List
-import irp
-
-import copy
-import cv2
+import gym
 import numpy as np
+import scipy.ndimage
 import matplotlib.pyplot as plt
 
-import gym
-from gym import spaces
-from gym.wrappers import TimeLimit
-
-from scipy.ndimage import median_filter
-
-import sklearn.metrics
-
-import irp.wrappers.discretize
+import irp
 import irp.envs as envs
 
-if typing.TYPE_CHECKING:
-    from irp.q import Q
-
-def process_thresholds(action, action_map, tis, n_thresholds):
-    return np.clip(tis + action_map[action], 0, n_thresholds - 1)
-
-def compute_dissimilarity(bit_mask, label):
-    height, width = label.shape
-
-    return np.sum(np.logical_xor(bit_mask, label)) / (height * width)
-
-def read_image(path):
+def read_image(
+    path: str
+) -> np.ndarray:
     return cv2.imread(path, cv2.IMREAD_GRAYSCALE)
 
-def extract_subimages(image, subimage_width, subimage_height, overlap=0):
-    if isinstance(image, tuple):
-        image = np.zeros(image)
+def read_sample(
+    filename: str,
+    preprocess: Optional[bool] = True
+) -> Tuple[np.ndarray, np.ndarray]:
+    base_path = os.path.join(irp.ROOT_DIR, "../../data/trus/")
+    image_path = os.path.join(base_path, 'images', filename)
+    label_path = os.path.join(base_path, 'labels', filename)
 
-    height, width = image.shape
-    subimages, coords = [], []
+    sample, label = read_image(image_path), read_image(label_path)
 
+    if preprocess:
+        sample = scipy.ndimage.median_filter(sample, 15)
+
+    return sample, label
+
+def extract_coordinates(
+    shape: Tuple[int, int],
+    subimage_width: int,
+    subimage_height: int,
+    overlap: Optional[float] = 0
+) -> np.ndarray:
+    width, height = shape
     height_step_size = int(subimage_height * (1 - overlap))
     width_step_size = int(subimage_width * (1 - overlap))
-    sizes = []
+
+    coords = []
 
     for y in range(0, height - (subimage_height - height_step_size), height_step_size):
         for x in range(0, width - (subimage_width - width_step_size), width_step_size):
-            subimage = image[y:y + subimage_height, x:x + subimage_width]
-
-            sizes.append(subimage.size)
-
-            subimages.append(subimage)
             coords.append((x, y))
+ 
+    return np.asarray(coords)
 
-    assert len(set(sizes)) == 1, f"Subimages have differing sizes: {set(sizes)}"
+def evaluate(environment: gym.Env, policy, max_steps: Optional[int] = 10, wait_for_done: Optional[bool] = False):
+    done = False
+    state, info = environment.reset(ti=0)
+    tis = [environment.ti]
 
-    return subimages, coords
+    for t in range(max_steps):
+        action = policy.predict(state)
+        state, reward, done, info = environment.step(action)
 
-def get_contours(mask):
-    return cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0]
+        tis.append(environment.ti)
 
-def get_largest_component(bit_mask):
-    num_labels, labels, stats, centroids = cv2.connectedComponentsWithStats(
-        bit_mask, 8, cv2.CV_32S
-    )
+        if is_oscilating(tis) is True:
+            break
 
-    # We've only found background pixels
-    if num_labels == 1:
-        return num_labels, 0, bit_mask
+    return info['d_sim'], done, environment.bitmask, environment.d_sim
 
-    # Get label of largest connected component, skipping the background
-    idx = np.argmax(stats[1:,4]) + 1
-    # Retrieve the area of the largest component
-    area = stats[idx][4]
-    # Select the labels that correspond to the largest component label
-    largest_component = (labels == idx).astype(np.uint8) * 255
+def extract_subimages(
+    *samples: np.ndarray,
+    subimage_width: int,
+    subimage_height: int,
+    overlap: Optional[float] = 0,
+    return_coords: Optional[bool] = False
+) -> List[Union[Tuple[np.ndarray, np.ndarray], np.ndarray]]:
+    height, width = samples[0].shape
+    results = []
 
-    return num_labels, area, largest_component
+    if return_coords:
+        coords = extract_coordinates((width, height), subimage_width, subimage_height, overlap)
 
-def get_compactness(contour, object_area):
-    object_perimeter = cv2.arcLength(contour, True)
+    for sample in samples:
+        subimages = []
 
-    return (4 * np.pi * object_area) / (object_perimeter ** 2)
+        height_step_size = int(subimage_height * (1 - overlap))
+        width_step_size = int(subimage_width * (1 - overlap))
+        sizes = []
 
-def get_area(contour):
-    # return cv2.countNonZero(contour)
-    return cv2.contourArea(contour)
+        i = 0
 
-def normalize_area(sub_image, object_area):
-    height, width = sub_image.shape
-    sub_image_area = height * width
+        for y in range(0, height - (subimage_height - height_step_size), height_step_size):
+            for x in range(0, width - (subimage_width - width_step_size), width_step_size):
+                subimage = sample[y:y + subimage_height, x:x + subimage_width]
 
-    return object_area / sub_image_area
+                subimages.append(subimage)
+                sizes.append(subimage.size)
 
-def get_dims(*args):
-    dims = tuple()
+                i += 1
 
-    for space in args:
-        if isinstance(space, spaces.MultiDiscrete):
-            dims += tuple(space.nvec)
+        assert len(set(sizes)) == 1, f"Subimages have differing sizes: {set(sizes)}"
+
+        if return_coords:
+            results.append((np.asarray(subimages), coords))
         else:
-            dims += (space.n,)
+            results.append(np.asarray(subimages))
 
-    return dims
-
-def discrete(sample, grid) -> Tuple[int, ...]:
-    # TODO: Checken of searchsorted en digitize dezelfde resultaten geven
-    # return tuple(int(np.digitize(s, g)) for s, g in zip(sample, grid))
-    return tuple(int(np.searchsorted(g, s)) for s, g in zip(sample, grid))
-
-def make_sample_label(*file_names, idx=184, width=32, height=16, overlap=0, ellipse=[1,1]):
-    base_path = os.path.join(irp.ROOT_DIR, "../../data/trus/")
-    image_path = os.path.join(base_path, 'images')
-    label_path = os.path.join(base_path, 'labels')
-
-    images, labels = [], []
-    
-    for file_name in file_names:
-        image = read_image(os.path.join(image_path, file_name))
-        image = median_filter(image, 15)
-        label = read_image(os.path.join(label_path, file_name))
-
-        subimages, coords = extract_subimages(image, width, height, overlap)
-        sublabels, coords = extract_subimages(label, width, height, overlap)
-
-        if idx is None:
-            images.append(subimages)
-            labels.append(sublabels)
-        else:
-            subimage = subimages[idx]
-            sublabel = sublabels[idx]
-
-            images.append(subimage)
-            labels.append(sublabel)
-    
-    return np.asarray(list(zip(images, labels)))
-
-def str_to_builtin(value: str, builtin: str = None):
-    # TODO: It's safer to use this way of casting variables, but for now use
-    # eval()
-    # return locate(builtin)(value)
-
-    return eval(value)
-
-def params_to_modelname(**kwargs):
-    return ','.join(list(f'{key}={value}' for key, value in kwargs.items()))
-
-def unwrap_sb3_env(*args):
-    return tuple(arg[0] for arg in args)
-
-def evaluate_policy(
-    model: Q, env: gym.Env, n_eval_episodes: int = 10, n_eval_timesteps: float = np.inf
-) -> Union[Tuple[float, float], Tuple[List[float], List[int]]]:
-
-    # These packages are extremely slow, so delay loading them
-    from stable_baselines3.common.vec_env import DummyVecEnv
-    from stable_baselines3.common.monitor import Monitor
-
-    env = Monitor(env)
-    env = DummyVecEnv([lambda: env])
-
-    episode_dissims = []
-
-    episode_count = 0
-    steps = 0
-
-    observation = env.reset()[0]
-
-    # Keep taking steps until an episode is finished
-    while episode_count < n_eval_episodes:
-        action = model.predict(observation, deterministic=True)
-
-        next_state, reward, done, info = env.step([action])
-        next_state, reward, done, info = unwrap_sb3_env(next_state, reward, done, info)
-        
-        steps += 1
-
-        truncated = steps >= n_eval_timesteps or 'TimeLimit.truncated' in info
-
-        # TODO: Optionally use `done`, we don't use this right now, as the environment
-        # shouldn't have access to the ground-truth in evaluation mode.
-        if truncated:
-            episode_dissims.append(info['dissimilarity'])
-            steps = 0
-            episode_count += 1
-
-            if truncated:
-                next_state = env.reset()[0]
-
-        observation = next_state
-
-    mean_reward = np.mean(episode_dissims)
-    std_reward = np.std(episode_dissims)
-
-    return mean_reward, std_reward
-
-# def setup_environment(
-#     image: np.ndarray, label: np.ndarray, num_thresholds: int,
-#     vjs: tuple, lows: dict, highs: dict, bins: tuple, episode_length: int,
-#     env_cls = None
-# ) -> gym.Env:
-#     # Initialize the environment
-#     if env_cls is None:
-#         env = irp.envs.sahba.sahba_2008_env.Sahba2008UltraSoundEnv(image, label, num_thresholds, vjs)
-#     else:
-#         env = env_cls(image, label, num_thresholds, vjs)
-
-#     # Cast continuous values to bins
-#     env = irp.wrappers.discretize.Discretize(env, lows, highs, bins)
-    
-#     # Set a maximum episode length
-#     env = TimeLimit(env, episode_length)
-
-#     return env
-
-def parse_highs(area, compactness, objects, label):
-    height, width = label.shape
-
-    if objects == "normalize":
-        objects = int(np.ceil(width / 2) * np.ceil(height / 2))
-
-    return {
-        'area': area,
-        'compactness': compactness,
-        'objects': objects
-    }
-
-def get_subimages(filename, width=32, height=16, overlap=0):
-    # Define the paths to the related parent directories
-    base_path = os.path.join(irp.GIT_DIR, "../data/trus/")
-    image_path = os.path.join(base_path, 'images')
-    label_path = os.path.join(base_path, 'labels')
-    # Read the image and label
-    image = read_image(os.path.join(image_path, filename))
-    image = median_filter(image, 15)
-    label = read_image(os.path.join(label_path, filename))
-
-    subimages = extract_subimages(image, width, height, overlap)[0]
-    sublabels = extract_subimages(label, width, height, overlap)[0]
-
-    return subimages, sublabels
+    return results
 
 def id_to_coord(
     id: int,
@@ -283,16 +142,6 @@ def coord_to_id(
                 return i
 
             i += 1
-
-def unravel_index(
-    i: int,
-    width: int,
-    height: int,
-    divisor: Optional[int] = 512
-):
-    x, y = (i * width) % divisor, ((i * width) // divisor) * height
-
-    return x, y
 
 def diamond(n):
     a = np.arange(n)
@@ -342,10 +191,10 @@ def get_neighborhood_images(
     subimage_width: int,
     subimage_height: int,
     overlap: Optional[float] = 0,
-    n_size: Optional[int] = 1,
+    n_size: Optional[int] = 0,
     shape: Optional[Tuple[int, int]] = (512, 512),
     neighborhood: Optional[Union[str, np.ndarray]] = 'moore'
-) -> np.ndarray:
+) -> Tuple[np.ndarray, np.ndarray]:
     neighborhood_coords = get_neighborhood(coord, shape, subimage_width, subimage_height, overlap, n_size, neighborhood)
 
     neighborhood_ids = [
@@ -354,33 +203,37 @@ def get_neighborhood_images(
 
     return np.asarray([subimages[i] for i in neighborhood_ids]), np.asarray([sublabels[i] for i in neighborhood_ids])
 
+def apply_action_sequence(subimage, sequence: List[Union[int, float, str]], fns: List[Callable]) -> np.ndarray:
+    fn, action = fns[0], sequence[0]
+
+    if not isinstance(action, tuple):
+        action = (action,)
+
+    bitmask = fn(subimage, *action)
+
+    for i in range(1, len(fns)):
+        fn, action = fns[i], sequence[i] 
+
+        if not isinstance(action, tuple):
+            action = [action]
+
+        bitmask = fn(bitmask, *action)
+
+    return bitmask
+
 def get_best_dissimilarity(
     subimage,
     sublabel,
     actions: List[Union[int, str]],
     fns: List[Callable],
     return_seq = False
-) -> Union[float, Tuple[float, int]]:
+) -> Union[float, Tuple[float, List]]:
     best_dissim = np.inf
     best_sequence = None
 
     for sequence in itertools.product(*actions):
-        fn, action = fns[0], sequence[0]
-
-        if not isinstance(action, tuple):
-            action = [action]
-
-        bitmask = fn(subimage, *action)
-
-        for i in range(1, len(fns)):
-            fn, action = fns[i], sequence[i] 
-
-            if not isinstance(action, tuple):
-                action = [action]
-
-            bitmask = fn(bitmask, *action)
-
-        dissim = envs.utils.compute_dissimilarity(bitmask, sublabel)
+        bitmask = apply_action_sequence(subimage, sequence, fns)
+        dissim = envs.utils.compute_dissimilarity(sublabel, bitmask)
 
         if dissim < best_dissim:
             best_dissim = dissim
@@ -391,7 +244,37 @@ def get_best_dissimilarity(
 
     return float(best_dissim)
 
-def show(sample):
+def get_best_dissimilarities(
+    subimage,
+    sublabel,
+    actions: List[Union[int, str]],
+    fns: List[Callable],
+    return_seq = False
+) -> Union[float, Tuple[float, List]]:
+    sequences = []
+    all_dissims = []
+    best_dissim = np.inf
+
+    for sequence in itertools.product(*actions):
+        bitmask = apply_action_sequence(subimage, sequence, fns)
+        dissim = envs.utils.compute_dissimilarity(sublabel, bitmask)
+
+        if dissim < best_dissim:
+            best_dissim = dissim
+            
+        sequences.append(sequence)
+        all_dissims.append(dissim)
+
+    all_dissims = np.asarray(all_dissims)
+
+    if return_seq:
+        return float(best_dissim), [sequences[i] for i in np.where(all_dissims == best_dissim)[0]]
+
+    return float(best_dissim)
+
+def show(*sample):
+    sample = np.hstack(sample)
+
     plt.imshow(sample, vmin=0, vmax=255, cmap='gray')
     plt.show()
 
@@ -402,8 +285,8 @@ def area_of_overlap(
     tp = ((label == 255) & (bitmask == 255)).sum()
     fn = ((bitmask == 0) & (label != bitmask)).sum()
 
-    if tp + fn == 0:
-        return 0.0
+    if (tp + fn) == 0.0:
+        return 1.0
 
     return tp / (tp + fn)
 
@@ -414,28 +297,22 @@ def precision(
     tp = ((label == 255) & (bitmask == 255)).sum()
     fp = ((bitmask == 255) & (label != bitmask)).sum()
 
-    if tp + fp == 0:
-        return 0.0
+    if (tp + fp) == 0.0:
+        return 1.0
 
     return tp / (tp + fp)
-
-def f1(
-    label: np.ndarray,
-    bitmask: np.ndarray
-) -> float:
-    label = (label / 255).astype(int)
-    bitmask = (bitmask / 255).astype(int)
-
-    return sklearn.metrics.f1_score(label.flatten(), bitmask.flatten())
 
 def jaccard(
     label: np.ndarray,
     bitmask: np.ndarray
 ) -> float:
-    intersection = np.logical_and(label, bitmask)
-    union = np.logical_or(label, bitmask)
+    intersection = np.logical_and(label, bitmask).sum()
+    union = np.logical_or(label, bitmask).sum()
 
-    return intersection.sum() / union.sum()
+    if union == 0.0:
+        return 1.0
+
+    return intersection / union
 
 def dice(
     label: np.ndarray,
@@ -445,14 +322,16 @@ def dice(
     fp = ((bitmask == 255) & (label != bitmask)).sum()
     fn = ((bitmask == 0) & (label != bitmask)).sum()
 
+    if (tp + fp + fn) == 0:
+        return 1.0
+
     return (2 * tp) / (2 * tp + fp + fn)
-    # union = 
 
-    # return (2 * (label & bitmask) / ((label > 0).sum() + (bitmask > 0).sum())
+def non_decreasing(sequence: List) -> bool:
+    return all( x <= y for x, y in zip(sequence, sequence[1:]))
 
-def vote(
-    sequence: List
-):
-    data = Counter(sequence)
+def non_increasing(sequence: List) -> bool:
+    return all(x >= y for x, y in zip(sequence, sequence[1:]))
 
-    return data.most_common(1)[0][0]
+def is_oscilating(sequence: List) -> bool:
+    return not (non_decreasing(sequence) or non_increasing(sequence))

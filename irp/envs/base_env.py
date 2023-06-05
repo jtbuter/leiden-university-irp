@@ -56,8 +56,8 @@ class UltraSoundEnv(gym.Env):
         pass
 
     @classmethod
-    def observation(self, bit_mask: np.ndarray) -> Tuple[float, float, int]:
-        contours = envs.utils.get_contours(bit_mask)
+    def observation(self, bitmask: np.ndarray) -> Tuple[float, float, int]:
+        contours = envs.utils.get_contours(bitmask)
         num_objects = len(contours)
 
         if num_objects == 0:
@@ -69,12 +69,13 @@ class UltraSoundEnv(gym.Env):
 
         # We found objects, but they are single pixels or lines
         if object_area == 0:
-            object_area = 1.
+            object_area = 1.0 # Counts number of non-zero pixels
+            # object_area = len(biggest_object) # Counts number of non-zero pixels
             compactness = 0.
         else:
             compactness = envs.utils.get_compactness(biggest_object, object_area)
 
-        normalized_area = envs.utils.normalize_area(bit_mask, object_area)
+        normalized_area = envs.utils.normalize_area(bitmask, object_area)
 
         return (normalized_area, compactness, num_objects)
 
@@ -86,23 +87,12 @@ class UltraSoundEnv(gym.Env):
         lt, rt = self.thresholds[self.threshold_ids]
 
         # Apply the thresholds
-        bit_mask = cv2.inRange(self.sample, int(lt), int(rt))
-        state = cv2.bitwise_and(self.sample, self.sample, mask=bit_mask)
+        bitmask = cv2.inRange(self.sample, int(lt), int(rt))
+        state = cv2.bitwise_and(self.sample, self.sample, mask=bitmask)
 
         # Show the final result
         plt.imshow(np.hstack([self.label, state]), cmap='gray', vmin=0, vmax=1)
         plt.show()
-
-    def _apply_opening(self, bit_mask, size):
-        # Check that the structuring element has a size
-        if size == 0:
-            return bit_mask
-
-        # Apply an opening to the bit-mask
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (size, size))
-        bit_mask = cv2.morphologyEx(bit_mask, cv2.MORPH_OPEN, kernel)
-
-        return bit_mask
 
     def close(self):
         pass
