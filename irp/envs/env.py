@@ -13,7 +13,7 @@ class Env(gym.Env):
     # Defines how parameters can be modified
     action_mapping = [-1, 1, 0]
 
-    def __init__(self, sample: np.ndarray, label: np.ndarray, n_thresholds: int):
+    def __init__(self, sample: np.ndarray, label: np.ndarray, n_thresholds: int, opening: Optional[int] = 0):
         self.sample = sample
         self.label = label
 
@@ -23,8 +23,9 @@ class Env(gym.Env):
         self._intensity_spectrum = np.insert(self._intensity_spectrum, 0, -1.0)
         
         self.n_thresholds = n_thresholds + 1
+        self.opening = opening
 
-        d_sim, seq = irp.utils.get_best_dissimilarities(sample, label, [self._intensity_spectrum, [2]], [envs.utils.apply_threshold, envs.utils.apply_opening], return_seq=True)
+        d_sim, seq = irp.utils.get_best_dissimilarities(sample, label, [self._intensity_spectrum, [opening]], [envs.utils.apply_threshold, envs.utils.apply_opening], return_seq=True)
         seq = np.asarray(seq)[:, 0]
 
         self._d_sim = d_sim
@@ -37,7 +38,7 @@ class Env(gym.Env):
 
         # Compute the new bitmask
         self.bitmask = envs.utils.apply_threshold(self.sample, th)
-        self.bitmask = envs.utils.apply_opening(self.bitmask, 2)
+        self.bitmask = envs.utils.apply_opening(self.bitmask, self.opening)
 
         # Compute the bitmask and compute the dissimilarity metric
         d_sim = envs.utils.compute_dissimilarity(self.label, self.bitmask)
@@ -56,12 +57,12 @@ class Env(gym.Env):
     def reset(self, ti: Optional[int] = None):
         # Pick random threshold intensity, or use the one specified by the user
         self.ti = np.random.randint(0, self.n_thresholds) if ti is None else ti
-        self.ti = self._randint(0, self.n_thresholds, exclude=self._ti_exc) if ti is None else ti
+        # self.ti = self._randint(0, self.n_thresholds, exclude=self._ti_exc) if ti is None else ti
         th = self._intensity_spectrum[self.ti]
 
         # Compute the bitmask and compute the dissimilarity metric
         self.bitmask = envs.utils.apply_threshold(self.sample, th)
-        self.bitmask = envs.utils.apply_opening(self.bitmask, 2)
+        self.bitmask = envs.utils.apply_opening(self.bitmask, self.opening)
 
         d_sim = envs.utils.compute_dissimilarity(self.label, self.bitmask)
 

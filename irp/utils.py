@@ -25,7 +25,7 @@ def read_sample(
     sample, label = read_image(image_path), read_image(label_path)
 
     if preprocess:
-        sample = scipy.ndimage.median_filter(sample, 15)
+        sample = scipy.ndimage.median_filter(sample, 7)
 
     return sample, label
 
@@ -34,7 +34,7 @@ def extract_coordinates(
     subimage_width: int,
     subimage_height: int,
     overlap: Optional[float] = 0
-) -> np.ndarray:
+) -> List[Tuple[int, int]]:
     width, height = shape
     height_step_size = int(subimage_height * (1 - overlap))
     width_step_size = int(subimage_width * (1 - overlap))
@@ -45,12 +45,14 @@ def extract_coordinates(
         for x in range(0, width - (subimage_width - width_step_size), width_step_size):
             coords.append((x, y))
  
-    return np.asarray(coords)
+    return coords
 
 def evaluate(environment: gym.Env, policy, max_steps: Optional[int] = 10, wait_for_done: Optional[bool] = False):
     done = False
-    state, info = environment.reset(ti=0)
+    state, info = environment.reset(ti=4)
     tis = [environment.ti]
+    bitmask = environment.bitmask.copy()
+    is_done = False
 
     for t in range(max_steps):
         action = policy.predict(state)
@@ -60,8 +62,15 @@ def evaluate(environment: gym.Env, policy, max_steps: Optional[int] = 10, wait_f
 
         if is_oscilating(tis) is True:
             break
+        elif tis[-1] == tis[-2]:
+            is_done = done
 
-    return info['d_sim'], done, environment.bitmask, environment.d_sim
+            break
+
+        bitmask = environment.bitmask.copy()
+        is_done = done
+
+    return info['d_sim'], is_done, bitmask, environment.d_sim
 
 def extract_subimages(
     *samples: np.ndarray,
@@ -69,18 +78,18 @@ def extract_subimages(
     subimage_height: int,
     overlap: Optional[float] = 0,
     return_coords: Optional[bool] = False
-) -> List[Union[Tuple[np.ndarray, np.ndarray], np.ndarray]]:
+) -> List[Union[Tuple[np.ndarray, List], np.ndarray]]:
     height, width = samples[0].shape
     results = []
 
     if return_coords:
         coords = extract_coordinates((width, height), subimage_width, subimage_height, overlap)
 
+    height_step_size = round(subimage_height * (1 - overlap))
+    width_step_size = round(subimage_width * (1 - overlap))
+
     for sample in samples:
         subimages = []
-
-        height_step_size = int(subimage_height * (1 - overlap))
-        width_step_size = int(subimage_width * (1 - overlap))
         sizes = []
 
         i = 0
@@ -154,15 +163,16 @@ def get_neighborhood(
     shape: Tuple[int, int],
     subimage_width: int,
     subimage_height: int,
-    overlap: Optional[float] = 0,
+    overlap: Optional[Union[float, Tuple[int, int]]] = 0,
     n_size: Optional[int] = 1,
     neighborhood = 'moore'
 ) -> List[Tuple]:
-    if isinstance(coord, int):
-        coord = id_to_coord(coord, shape, subimage_width, subimage_height, overlap)
-
-    width_step_size = round((1 - overlap) * subimage_width, 0)
-    height_step_size = round((1 - overlap) * subimage_height, 0)
+    if isinstance(coord, int): coord = id_to_coord(coord, shape, subimage_width, subimage_height, overlap)
+    if isinstance(overlap, float):
+        width_step_size = round((1 - overlap) * subimage_width, 0)
+        height_step_size = round((1 - overlap) * subimage_height, 0)
+    elif isinstance(overlap, tuple):
+        width_step_size, height_step_size = overlap
 
     x, y = coord
     coords = []
