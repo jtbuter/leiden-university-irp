@@ -19,7 +19,7 @@ neighborhood_parameters = {
     'neighborhood': 'neumann'
 }
 environment_parameters = {
-    'n_thresholds': 6
+    'n_thresholds': 15
 }
 
 (image, truth), (t_image, t_truth) = irp.utils.read_sample('case10_10.png'), irp.utils.read_sample('case10_11.png')
@@ -27,21 +27,30 @@ subimages, sublabels, t_subimages, t_sublabels = irp.utils.extract_subimages(
     image, truth, t_image, t_truth, **image_parameters
 )
 coords = irp.utils.extract_coordinates(image.shape, **dict(image_parameters, **{'overlap': 0}))
+evaluations = []
 
-result = np.zeros((512, 512))
+for i in range(10, 20):
+    environment_parameters['n_thresholds'] = i
 
-for sample_coord in coords:
-    x, y = sample_coord
+    result = np.zeros((512, 512))
 
-    sample_id = irp.utils.coord_to_id(sample_coord, image.shape, **image_parameters)
-    sample, label = subimages[sample_id], sublabels[sample_id]
-    intensity_spectrum = irp.envs.utils.get_intensity_spectrum(sample, **environment_parameters, add_minus=True)
+    for sample_coord in coords:
+        x, y = sample_coord
 
-    dissim, sequence = irp.utils.get_best_dissimilarity(sample, label, [itertools.product(intensity_spectrum, intensity_spectrum), [8]], [irp.envs.utils.apply_threshold, irp.envs.utils.apply_opening], return_seq=True)
-    bitmask = irp.utils.apply_action_sequence(sample, sequence, [irp.envs.utils.apply_threshold, irp.envs.utils.apply_opening])
+        sample_id = irp.utils.coord_to_id(sample_coord, image.shape, **image_parameters)
+        sample, label = subimages[sample_id], sublabels[sample_id]
+        intensity_spectrum = irp.envs.utils.get_intensity_spectrum(sample, **environment_parameters, add_minus=True)
 
-    result[y:y+image_parameters['subimage_height'], x:x+image_parameters['subimage_width']] = bitmask
+        dissim, sequence = irp.utils.get_best_dissimilarity(sample, label, [itertools.product(intensity_spectrum, intensity_spectrum), [7]], [irp.envs.utils.apply_threshold, irp.envs.utils.apply_opening], return_seq=True)
+        bitmask = irp.utils.apply_action_sequence(sample, sequence, [irp.envs.utils.apply_threshold, irp.envs.utils.apply_opening])
 
-print(irp.utils.dice(truth, result))
-irp.utils.show(result)
+        result[y:y+image_parameters['subimage_height'], x:x+image_parameters['subimage_width']] = bitmask
+
+    evaluations.append(irp.utils.dice(truth, result))
+
+    print(i, irp.utils.dice(truth, result))
+    # irp.utils.show(result)
+
+plt.plot(evaluations)
+plt.show()
 

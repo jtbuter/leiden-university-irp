@@ -85,8 +85,8 @@ def extract_subimages(
     if return_coords:
         coords = extract_coordinates((width, height), subimage_width, subimage_height, overlap)
 
-    height_step_size = round(subimage_height * (1 - overlap))
-    width_step_size = round(subimage_width * (1 - overlap))
+    height_step_size = int(round(subimage_height * (1 - overlap)))
+    width_step_size = int(round(subimage_width * (1 - overlap)))
 
     for sample in samples:
         subimages = []
@@ -122,8 +122,8 @@ def id_to_coord(
     height, width = shape
     i = 0
 
-    height_step_size = int(subimage_height * (1 - overlap))
-    width_step_size = int(subimage_width * (1 - overlap))
+    height_step_size = int(round(subimage_height * (1 - overlap), 0))
+    width_step_size = int(round(subimage_width * (1 - overlap), 0))
 
     for y in range(0, height - (subimage_height - height_step_size), height_step_size):
         for x in range(0, width - (subimage_width - width_step_size), width_step_size):
@@ -142,8 +142,11 @@ def coord_to_id(
     height, width = shape
     i = 0
 
-    height_step_size = int(subimage_height * (1 - overlap))
-    width_step_size = int(subimage_width * (1 - overlap))
+    if isinstance(overlap, float):
+        width_step_size = int(round((1 - overlap) * subimage_width, 0))
+        height_step_size = int(round((1 - overlap) * subimage_height, 0))
+    elif isinstance(overlap, tuple):
+        width_step_size, height_step_size = overlap
 
     for y in range(0, height - (subimage_height - height_step_size), height_step_size):
         for x in range(0, width - (subimage_width - width_step_size), width_step_size):
@@ -169,8 +172,8 @@ def get_neighborhood(
 ) -> List[Tuple]:
     if isinstance(coord, int): coord = id_to_coord(coord, shape, subimage_width, subimage_height, overlap)
     if isinstance(overlap, float):
-        width_step_size = round((1 - overlap) * subimage_width, 0)
-        height_step_size = round((1 - overlap) * subimage_height, 0)
+        width_step_size = int(round((1 - overlap) * subimage_width, 0))
+        height_step_size = int(round((1 - overlap) * subimage_height, 0))
     elif isinstance(overlap, tuple):
         width_step_size, height_step_size = overlap
 
@@ -343,5 +346,14 @@ def non_decreasing(sequence: List) -> bool:
 def non_increasing(sequence: List) -> bool:
     return all(x >= y for x, y in zip(sequence, sequence[1:]))
 
+def strictly_increasing(sequence: List):
+    return all(x < y for x, y in zip(sequence, sequence[1:]))
+
+def strictly_decreasing(sequence: List):
+    return all(x > y for x, y in zip(sequence, sequence[1:]))
+
 def is_oscilating(sequence: List) -> bool:
-    return not (non_decreasing(sequence) or non_increasing(sequence))
+    return not (strictly_increasing(sequence) or strictly_decreasing(sequence))
+
+def normalize_coord(main_coord: Tuple[int, int], neighbor_coord: Tuple[int, int], x_step: int, y_step: int):
+    return neighbor_coord[0] - main_coord[0] + x_step, neighbor_coord[1] - main_coord[1] + y_step
