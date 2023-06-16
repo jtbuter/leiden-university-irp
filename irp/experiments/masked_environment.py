@@ -97,6 +97,7 @@ irp.utils.show(*bitmasks)
 
 irp.utils.show(label)
 
+named_actions = ['decrease', 'increase']
 agent = Qlearning(environment)
 pi = agent.learn(**agent_parameters, callback=callback)
 
@@ -104,7 +105,13 @@ for i in range(environment.n_thresholds):
     state, info = environment.reset(ti=i)
     bitmask = environment.bitmask
 
-    print(UltraSoundEnv.observation(bitmask), pi.values(state), pi.predict(state, lambda: environment.action_mask()), environment.action_mask(), info['d_sim'])
+    print(
+        'State:', UltraSoundEnv.observation(bitmask), '\n',
+        'Q(s, a):', pi.values(state), '\n',
+        'Best action:', named_actions[pi.predict(state, lambda: environment.action_mask())], '\n',
+        'Action mask:', environment.action_mask(), '\n',
+        'Info:', info['d_sim']
+    )
     print(state)
 
 

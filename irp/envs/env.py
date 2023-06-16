@@ -26,33 +26,37 @@ class Env(gym.Env):
 
         self._d_sim_opt = irp.utils.get_best_dissimilarity(sample, label, [self._intensity_spectrum, [opening]], [envs.utils.apply_threshold, envs.utils.apply_opening])
 
-    def step(self, action: int):
-        # Update the threshold index
-        ti = self.ti + self.action_mapping[action]
+    def step(self, action: int) -> Tuple[Tuple[float, float, int], int, bool, Dict[str, float]]:
+        # Observe the transition after this action, and update our local parameters
+        self.ti, self.bitmask = self.transition(action)
 
-        assert min(max(0, ti), self.n_thresholds - 1) == ti, f'{min(max(0, ti), self.n_thresholds - 1)} != {ti}'
-
-        th = self._intensity_spectrum[ti]
-
-        self.ti = ti
-
-        # Compute the new bitmask
-        self.bitmask = envs.utils.apply_threshold(self.sample, th)
-        self.bitmask = envs.utils.apply_opening(self.bitmask, self.opening)
-
-        # Compute the bitmask and compute the dissimilarity metric
+        # Compute the dissimilarity metric
         d_sim = envs.utils.compute_dissimilarity(self.label, self.bitmask)
 
-        # We're done if we match the best dissimilarity
-        done = d_sim <= self._d_sim_opt
-
-        # Did we reach the best possible dissimilarity
-        if done:
+        # Did we improve the dissimilarity compared to the previous timestep
+        if d_sim < self._d_sim_old:
             reward = 1
         else:
             reward = -1
 
+        # Update the dissimilarity for the next timestep
+        self._d_sim_old = d_sim
+
+        # We're done if we match the best dissimilarity
+        done = d_sim <= self._d_sim_opt
+
         return UltraSoundEnv.observation(self.bitmask), reward, done, {'d_sim': d_sim}
+
+    def transition(self, action: int) -> Tuple[int, np.ndarray]:
+        # Compute the new threshold index and intensity
+        ti = self.ti + self.action_mapping[action]
+        th = self._intensity_spectrum[ti]
+
+        # Compute the new bitmask
+        bitmask = envs.utils.apply_threshold(self.sample, th)
+        bitmask = envs.utils.apply_opening(bitmask, self.opening)
+
+        return ti, bitmask
 
     def reset(self, ti: Optional[int] = None) -> Tuple[Tuple[float, float, int], Dict[str, float]]:
         # Pick random threshold intensity, or use the one specified by the user
@@ -63,9 +67,9 @@ class Env(gym.Env):
         self.bitmask = envs.utils.apply_threshold(self.sample, th)
         self.bitmask = envs.utils.apply_opening(self.bitmask, self.opening)
 
-        d_sim = envs.utils.compute_dissimilarity(self.label, self.bitmask)
+        self._d_sim_old = envs.utils.compute_dissimilarity(self.label, self.bitmask)
 
-        return UltraSoundEnv.observation(self.bitmask), {'d_sim': d_sim}
+        return UltraSoundEnv.observation(self.bitmask), {'d_sim': self._d_sim_old}
 
     def action_mask(self) -> np.ndarray:
         mask = np.zeros(self.action_space.n)
@@ -76,7 +80,31 @@ class Env(gym.Env):
             # Check if this action doesn't make the index go out of bounds
             mask[action] = ti >= 0 and ti < self.n_thresholds
 
-        return mask
+        return mask.astype(bool)
+
+    def guidance_mask(self) -> np.ndarray:
+        action_mask = self.action_mask()
+        mask = np.zeros(self.action_space.n)
+
+        for action in range(self.action_space.n):
+            # Ensure we don't try to use any invalid actions
+            if action_mask[action] == False:
+                continue
+
+            # Perform a reversible transition
+            ti, bitmask = self.transition(action)
+
+            # Compute the dissimilarity metric
+            d_sim = envs.utils.compute_dissimilarity(self.label, bitmask)
+
+            # Check if this action would give a positive reward
+            mask[action] = d_sim < self._d_sim_old
+
+        # If no actions return a positive reward, allow all actions to be chosen
+        if not np.any(mask):
+            mask = np.ones(self.action_space.n)
+
+        return mask.astype(bool)
 
     def _randint(self, start: int, stop: int, exclude: Optional[List] = []):
         include = range(start, stop)
@@ -86,6 +114,10 @@ class Env(gym.Env):
     @property
     def d_sim_opt(self) -> float:
         return self._d_sim_opt
+
+    @property
+    def d_sim_old(self) -> float:
+        return self._d_sim_old
 
     @property
     def d_sim(self) -> float:

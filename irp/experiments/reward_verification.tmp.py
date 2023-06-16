@@ -66,16 +66,29 @@ environment = Env(sample, label, **environment_parameters)
 environment = Tiled(environment, **tiling_parameters)
 environment = ActionMasker(environment)
 
-for i in range(environment.n_thresholds):
-    reward1, done1, info1, reward2, done2, info2 = (None,) * 6
+done = False
+state, info = environment.reset(ti=2)
 
-    state, info = environment.reset(ti=i)
 
-    if i != 0:
-        state, reward1, done1, info1 = environment.step(0)
+# while not done:
+#     action = environment.action_space.sample()
 
-    if i != environment.n_thresholds - 1:
-        state, reward2, done2, info2 = environment.step(1)
+#     print('Action', action)
 
-    print('left', reward1, done1, info1, 'right', reward2, done2, info2)
-    # environment.step(1)
+#     state, reward, done, info = environment.step(action)
+
+# irp.utils.show(environment.bitmask)
+
+# for i in range(environment.n_thresholds):
+#     reward1, done1, info1, reward2, done2, info2 = (None,) * 6
+
+#     state, info = environment.reset(ti=i)
+
+#     if i != 0:
+#         state, reward1, done1, info1 = environment.step(0)
+
+#     if i != environment.n_thresholds - 1:
+#         state, reward2, done2, info2 = environment.step(1)
+
+#     print('left', reward1, done1, info1, 'right', reward2, done2, info2)
+#     # environment.step(1)

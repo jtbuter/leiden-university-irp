@@ -35,8 +35,12 @@ class MaskedDiscrete(gym.spaces.Discrete):
         return None
 
 class ActionMasker(gym.Wrapper):
-    def __init__(self, env: gym.Env, mask_fn: Optional[Callable] = lambda env: env.action_mask()) -> None:
+    def __init__(self, env: gym.Env, mask_fn: Optional[Callable] = None) -> None:
         super().__init__(env)
+
+        if mask_fn is None:
+            # Out of the allowed actions, select the ones that give a positive reward
+            mask_fn = lambda env: env.action_mask()[env.guidance_mask()]
 
         self._action_space = MaskedDiscrete(env.action_space.n, lambda: mask_fn(env))
 
