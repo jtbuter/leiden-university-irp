@@ -47,15 +47,15 @@ def extract_coordinates(
  
     return coords
 
-def evaluate(environment: gym.Env, policy, max_steps: Optional[int] = 10, wait_for_done: Optional[bool] = False):
+def evaluate(environment: gym.Env, policy, max_steps: Optional[int] = 10, wait_for_done: Optional[bool] = False) -> Tuple[float, bool, np.ndarray]:
     done = False
-    state, info = environment.reset(ti=4)
+    state, info = environment.reset(ti=0)
     tis = [environment.ti]
     bitmask = environment.bitmask.copy()
     is_done = False
 
     for t in range(max_steps):
-        action = policy.predict(state)
+        action = policy.predict(state, lambda: environment.action_mask())
         state, reward, done, info = environment.step(action)
 
         tis.append(environment.ti)
@@ -70,7 +70,7 @@ def evaluate(environment: gym.Env, policy, max_steps: Optional[int] = 10, wait_f
         bitmask = environment.bitmask.copy()
         is_done = done
 
-    return info['d_sim'], is_done, bitmask, environment.d_sim
+    return info['d_sim'], is_done, bitmask
 
 def extract_subimages(
     *samples: np.ndarray,

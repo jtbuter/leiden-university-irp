@@ -42,9 +42,9 @@ agent_parameters = {
     'alpha': 0.6,
     'max_t': 1000,
     'max_e': 3000,
-    'ep_max': 0.6,
-    'ep_min': 0.6,
-    'ep_frac': 0.01,
+    'eps_max': 0.6,
+    'eps_min': 0.6,
+    'eps_frac': 0.01,
     'gamma': 0.8,
 }
 environment_parameters = {
