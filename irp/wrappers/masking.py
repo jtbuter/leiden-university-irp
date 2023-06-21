@@ -26,8 +26,9 @@ class MaskedDiscrete(gym.spaces.Discrete):
             return super().sample()
 
     def _sample(self) -> Union[int, None]:
-        mask = self.mask_fn()
-        valid_action_mask = mask == 1
+        valid_action_mask = self.mask_fn()
+
+        # print(valid_action_mask)
 
         if np.any(valid_action_mask):
             return int(self.np_random.choice(np.where(valid_action_mask)[0]))
@@ -40,9 +41,20 @@ class ActionMasker(gym.Wrapper):
 
         if mask_fn is None:
             # Out of the allowed actions, select the ones that give a positive reward
-            mask_fn = lambda env: env.action_mask()[env.guidance_mask()]
+            mask_fn = lambda env: self._construct_mask(env.action_mask(), env.guidance_mask())
 
         self._action_space = MaskedDiscrete(env.action_space.n, lambda: mask_fn(env))
+
+    @classmethod
+    def _construct_mask(self, action_mask: np.ndarray, guidance_mask: np.ndarray):
+        # Find actions that we both encourage to take and are available
+        mask = np.logical_and(action_mask, guidance_mask)
+
+        # If none of the reward maximizing actions are available, choose any allowed action
+        if not np.any(mask):
+            return action_mask
+        else:
+            return mask
 
     @property
     def action_space(self) -> MaskedDiscrete:

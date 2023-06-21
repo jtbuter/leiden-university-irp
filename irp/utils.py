@@ -49,7 +49,7 @@ def extract_coordinates(
 
 def evaluate(environment: gym.Env, policy, max_steps: Optional[int] = 10, wait_for_done: Optional[bool] = False) -> Tuple[float, bool, np.ndarray]:
     done = False
-    state, info = environment.reset(ti=0)
+    state, info = environment.reset(ti=(0, 0))
     tis = [environment.ti]
     bitmask = environment.bitmask.copy()
     is_done = False
@@ -298,10 +298,7 @@ def area_of_overlap(
     tp = ((label == 255) & (bitmask == 255)).sum()
     fn = ((bitmask == 0) & (label != bitmask)).sum()
 
-    if (tp + fn) == 0.0:
-        return 1.0
-
-    return tp / (tp + fn)
+    return tp / (tp + fn + 1e-6)
 
 def precision(
     label: np.ndarray,
@@ -310,35 +307,34 @@ def precision(
     tp = ((label == 255) & (bitmask == 255)).sum()
     fp = ((bitmask == 255) & (label != bitmask)).sum()
 
-    if (tp + fp) == 0.0:
-        return 1.0
-
-    return tp / (tp + fp)
+    return tp / (tp + fp + 1e-6)
 
 def jaccard(
     label: np.ndarray,
     bitmask: np.ndarray
 ) -> float:
+    if not np.any(label):
+        label = np.ones_like(label) * 255
+        bitmask = np.logical_not(bitmask) * 255
+        
     intersection = np.logical_and(label, bitmask).sum()
     union = np.logical_or(label, bitmask).sum()
 
-    if union == 0.0:
-        return 1.0
-
-    return intersection / union
+    return intersection / (union + 1e-6)
 
 def dice(
     label: np.ndarray,
     bitmask: np.ndarray
 ) -> float:
+    if not np.any(label):
+        label = np.ones_like(label) * 255
+        bitmask = np.logical_not(bitmask) * 255
+
     tp = ((label == 255) & (bitmask == 255)).sum()
     fp = ((bitmask == 255) & (label != bitmask)).sum()
     fn = ((bitmask == 0) & (label != bitmask)).sum()
 
-    if (tp + fp + fn) == 0:
-        return 1.0
-
-    return (2 * tp) / (2 * tp + fp + fn)
+    return (2 * tp) / ((2 * tp + fp + fn) + 1e-6)
 
 def non_decreasing(sequence: List) -> bool:
     return all( x <= y for x, y in zip(sequence, sequence[1:]))
@@ -357,3 +353,32 @@ def is_oscilating(sequence: List) -> bool:
 
 def normalize_coord(main_coord: Tuple[int, int], neighbor_coord: Tuple[int, int], x_step: int, y_step: int):
     return neighbor_coord[0] - main_coord[0] + x_step, neighbor_coord[1] - main_coord[1] + y_step
+
+def find_repeating_path(sequence):
+    seen = []
+    i = 0
+
+    while i < len(sequence):
+        item = sequence[i]
+
+        if item not in seen:
+            seen.append(item)
+        else:
+            return list(range(seen.index(item), i + 1))
+
+        i += 1
+
+    return []
+
+def simplify_sequence(states, values):
+    simple_sequence = []
+    i = 0
+
+    while i < len(states):
+        # The previous state is the same as the current one
+        if not (i > 0 and tuple(states[i - 1]) == tuple(states[i])):
+            simple_sequence.append(values[i])
+
+        i += 1
+
+    return simple_sequence

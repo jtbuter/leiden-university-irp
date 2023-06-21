@@ -10,13 +10,15 @@ from irp.envs.base_env import UltraSoundEnv
 from irp.wrappers.masking import ActionMasker
 from irp.wrappers.tiled import Tiled
 from irp.agents.qlearning import Qlearning
+from irp.agents.sarsa import Sarsa
 
 results = []
 
 def eval(local):
-    d_sim, done, bitmask = irp.utils.evaluate(environment, local['self'].policy, max_steps=environment.n_thresholds)
+    pass
+    # d_sim, done, bitmask = irp.utils.evaluate(environment, local['self'].policy, max_steps=environment.n_thresholds)
 
-    results.append(d_sim)
+    # results.append(d_sim)
 
 callback = {
     'interval': 10,
@@ -34,8 +36,8 @@ neighborhood_parameters = {
     'neighborhood': 'neumann'
 }
 tiling_parameters = {
-    'tiles_per_dim': (2, 2, 1),
-    'tilings': 16,
+    'tiles_per_dim': (4, 4, 2),
+    'tilings': 64,
     'limits': [(0, 1), (0, 1), (0, 4)]
 }
 agent_parameters = {
@@ -48,7 +50,7 @@ agent_parameters = {
     'gamma': 0.6,
 }
 environment_parameters = {
-    'n_thresholds': 8,
+    'n_thresholds': 6,
     'opening': 8
 }
 
@@ -56,64 +58,66 @@ environment_parameters = {
 subimages, sublabels, t_subimages, t_sublabels = irp.utils.extract_subimages(
     image, truth, t_image, t_truth, **image_parameters
 )
-coord = (288 - 16, 272 + 8)
+coord = (320, 272)
 
 sample_id = irp.utils.coord_to_id(coord, image.shape, **image_parameters)
 sample, label = subimages[sample_id], sublabels[sample_id]
 t_sample, t_label = t_subimages[sample_id], t_sublabels[sample_id]
 
-print(np.min(sample), np.max(sample))
-
-print(envs.utils.get_intensity_spectrum(sample, environment_parameters['n_thresholds'], add_minus=True))
-
 environment = Env(sample, label, **environment_parameters)
 environment = Tiled(environment, **tiling_parameters)
 environment = ActionMasker(environment)
 
-t_environment = Env(t_sample, t_label, **environment_parameters)
-t_environment = Tiled(t_environment, **tiling_parameters)
-t_environment = ActionMasker(t_environment)
-
-intensities = envs.utils.get_intensity_spectrum(sample, environment_parameters['n_thresholds'], add_minus=True)
-
-bitmasks = []
-j = 0
-
-for f, intensity in enumerate(intensities):
-    bitmask = irp.utils.apply_action_sequence(sample, (intensity, 8), (envs.utils.apply_threshold, envs.utils.apply_opening))
-
-    if envs.utils.compute_dissimilarity(label, bitmask) == environment.d_sim_opt:
-        j = f
-        print('x', UltraSoundEnv.observation(bitmask))
-        irp.utils.show(bitmask)
-    else:
-        print(UltraSoundEnv.observation(bitmask))
-
-    bitmasks.append(bitmask)
-
-print()
-
-irp.utils.show(*bitmasks)
-
-irp.utils.show(label)
-
-named_actions = ['decrease', 'increase']
-agent = Qlearning(environment)
+agent = Sarsa(environment)
 pi = agent.learn(**agent_parameters, callback=callback)
 
-for i in range(environment.n_thresholds):
-    state, info = environment.reset(ti=i)
-    bitmask = environment.bitmask
+ti = (0, environment.n_thresholds - 1)
+ti = (1, 5)
 
-    print(
-        'State:', UltraSoundEnv.observation(bitmask), '\n',
-        'Q(s, a):', pi.values(state), '\n',
-        'Best action:', named_actions[pi.predict(state, lambda: environment.action_mask())], '\n',
-        'Action mask:', environment.action_mask(), '\n',
-        'Info:', info['d_sim']
-    )
-    print(state)
+done = False
+state, info = environment.reset(ti=ti)
 
+print(pi.values(state)[np.where(environment.guidance_mask() == True)[0]])
+
+print(np.asarray(environment.action_mapping)[np.where(environment.guidance_mask() == True)[0]])
+
+print(info['d_sim'], environment.d_sim_opt)
+print('Internal ti on initialization', environment.ti_left, environment.ti_right)
+irp.utils.show(environment.bitmask, environment.label)
+
+states = []
+values = []
+
+for step in range(30):
+    action = pi.predict(state, environment.action_mask)
+    state, reward, done, info = environment.step(action)
+
+    print('Action', action, environment.action_mapping[action])
+    print('Internal ti after action', environment.ti_left, environment.ti_right)
+    print('Step status', reward, 'Target' if done else 'Searching', info)
+
+    qvalues = pi.values(state)[environment.action_mask()]
+
+    print('Min, max Q-value', min(qvalues), max(qvalues))
+
+    states.append(state)
+    values.append(max(qvalues))
+
+    states_ = irp.utils.simplify_sequence(states, states)
+    path = irp.utils.find_repeating_path(list(map(tuple, states_)))
+
+    if len(path):
+        best_vals = [values[p] for p in path]
+
+        print('Assumed target', min(best_vals))
+
+        break
+
+# print(irp.utils.simplify_sequence(states, values))
+
+# t_environment = Env(t_sample, t_label, **environment_parameters)
+# t_environment = Tiled(t_environment, **tiling_parameters)
+# t_environment = ActionMasker(t_environment)
 
 raise Exception
 values = [pi.values(t_environment.reset(ti=i)[0]) for i in range(t_environment.n_thresholds)]

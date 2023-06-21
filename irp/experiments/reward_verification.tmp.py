@@ -1,3 +1,6 @@
+import itertools
+from typing import Union
+import gym
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -56,7 +59,7 @@ environment_parameters = {
 subimages, sublabels, t_subimages, t_sublabels = irp.utils.extract_subimages(
     image, truth, t_image, t_truth, **image_parameters
 )
-coord = (288 - 16, 272 + 8)
+coord = (320, 272)
 
 sample_id = irp.utils.coord_to_id(coord, image.shape, **image_parameters)
 sample, label = subimages[sample_id], sublabels[sample_id]
@@ -66,8 +69,46 @@ environment = Env(sample, label, **environment_parameters)
 environment = Tiled(environment, **tiling_parameters)
 environment = ActionMasker(environment)
 
-done = False
-state, info = environment.reset(ti=2)
+environment: Union[Env, Tiled, ActionMasker]
+
+dsim, seq = irp.utils.get_best_dissimilarities(
+    sample,
+    label,
+    [itertools.product(environment.intensity_spectrum, environment.intensity_spectrum), [8]],
+    [envs.utils.apply_threshold, envs.utils.apply_opening],
+    return_seq=True
+)
+
+ti = (np.where(environment.intensity_spectrum == seq[0][0][0])[0][0], np.where(environment.intensity_spectrum == seq[0][0][1])[0][0])
+
+print(ti)
+
+state, info = environment.reset(ti=ti)
+
+print(info, environment.d_sim_opt)
+irp.utils.show(environment.bitmask, environment.label)
+
+print(environment.intensity_spectrum)
+
+
+# # done = False
+# state, info = environment.reset(ti=ti)
+
+# irp.utils.show(environment.bitmask)
+
+# action_mapping = np.asarray(environment.action_mapping)
+
+# print(np.where(environment.guidance_mask() == True)[0])
+
+# print(action_mapping[np.logical_and(environment.action_mask(), environment.guidance_mask())])
+
+# for action in np.where(np.logical_and(environment.action_mask(), environment.guidance_mask()) == True)[0]:
+#     state, info = environment.reset(ti=ti)
+#     state, reward, done, info = environment.step(action)
+
+#     print(reward)
+
+# environment.transition(4)
 
 
 # while not done:

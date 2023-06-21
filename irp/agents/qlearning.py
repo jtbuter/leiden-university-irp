@@ -1,12 +1,15 @@
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Union
 import numpy as np
 import gym
 
+from irp.envs.env import Env
+from irp.wrappers.masking import ActionMasker
+from irp.wrappers.tiled import Tiled
 from irp.policies.tiled_policy import TiledQ
 from irp.policies.mask_tiled_policy import MaskTiledQ
 
 class Qlearning():
-    def __init__(self, environment: gym.Env):
+    def __init__(self, environment: Union[gym.Env, Env, ActionMasker, Tiled]):
         self.environment = environment
         self.t = 0
         self.e = 0
@@ -21,18 +24,17 @@ class Qlearning():
         self.policy = MaskTiledQ(self.environment.T.n_tiles, self.environment.action_space.n, alpha=alpha)
 
         eps = eps_max
-        continue_training = True
-        time_exceeded = False
+        continue_training, time_exceeded = True, False
 
         while self.e < max_e:
-            state, info = self.environment.reset(ti=len(self.environment.intensity_spectrum) - 1)
+            state, info = self.environment.reset()
             done = False
 
             while not done:
                 if np.random.random() < eps:
                     action = self.environment.action_space.sample()
                 else:
-                    action = self.policy.predict(state, lambda: self.environment.action_mask())
+                    action = self.policy.predict(state, self.environment.action_mask)
 
                 next_state, reward, done, info = self.environment.step(action)
                 target = reward + gamma * max(self.policy.values(next_state))
@@ -49,8 +51,6 @@ class Qlearning():
                     break
 
             self.e += 1
-
-            print(self.e)
 
             eps = max(eps_min, eps - eps_frac)
 

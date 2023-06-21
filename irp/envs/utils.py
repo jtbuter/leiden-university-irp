@@ -11,6 +11,22 @@ def update_thresholds(
 ) -> np.ndarray:
     return np.clip(old_tis + action_map[action], a_min=0, a_max=n_thresholds - 1)
 
+def apply_threshold_(
+    sample: np.ndarray,
+    ti_left: int,
+    ti_right: Optional[int] = None
+) -> np.ndarray:
+    ti_left = int(ti_left)
+    
+    # If the right threshold isn't set, make the left one irrelevant by defaulting it to -1
+    if ti_right is None:
+        ti_right = ti_left
+        ti_left = -1
+
+    ti_right = int(ti_right)
+
+    return cv2.inRange(sample, ti_left, ti_right)
+
 def apply_threshold(
     sample: np.ndarray,
     ti_left: int,
@@ -18,12 +34,12 @@ def apply_threshold(
 ) -> np.ndarray:
     ti_left = int(ti_left)
 
-    # We can't make this threshold using opencv
-    if ti_left < 0:
-        return np.zeros_like(sample)
-
     # Only use a single cut-off value
     if ti_right is None:
+        # We can't make this threshold using cv2.threshold
+        if ti_left < 0:
+            return np.zeros_like(sample)
+
         bitmask = cv2.threshold(sample, ti_left, 255, cv2.THRESH_BINARY_INV)[1]
     else:
         ti_right = int(ti_right)
@@ -61,9 +77,9 @@ def get_intensity_spectrum(
 def compute_dissimilarity(
     label: np.ndarray,
     bitmask: np.ndarray,
-    fn: Callable = lambda x, y: (x != y).sum() / y.size
+    fn: Callable = lambda x, y: (x == y).sum() / (y.size + 1e-6)
 ) -> float:
-    return fn(label, bitmask)
+    return 1 - fn(label, bitmask)
 
 def get_contours(
     bitmask: np.ndarray

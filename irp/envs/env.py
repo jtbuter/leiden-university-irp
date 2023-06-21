@@ -1,5 +1,6 @@
 from typing import Dict, List, Optional, Tuple, Union
 
+import itertools
 import gym
 import gym.spaces
 import numpy as np
@@ -10,8 +11,8 @@ import irp.utils
 from irp.envs.base_env import UltraSoundEnv
 
 class Env(gym.Env):
-    # Defines how parameters can be modified
-    action_mapping = [-1, 1]
+    # Define how parameters can be modified, and remove the neutral action
+    action_mapping = list(itertools.product([-1, 1, 0], [-1, 1, 0])); action_mapping.remove((0, 0))
 
     def __init__(self, sample: np.ndarray, label: np.ndarray, n_thresholds: int, opening: Optional[int] = 0):
         self.sample = sample
@@ -24,11 +25,15 @@ class Env(gym.Env):
         self.n_thresholds = len(self._intensity_spectrum)
         self.opening = opening
 
-        self._d_sim_opt = irp.utils.get_best_dissimilarity(sample, label, [self._intensity_spectrum, [opening]], [envs.utils.apply_threshold, envs.utils.apply_opening])
+        self._d_sim_opt = irp.utils.get_best_dissimilarity(
+            sample, label,
+            [itertools.product(self._intensity_spectrum,self._intensity_spectrum), [opening]],
+            [envs.utils.apply_threshold, envs.utils.apply_opening]
+        )
 
     def step(self, action: int) -> Tuple[Tuple[float, float, int], int, bool, Dict[str, float]]:
         # Observe the transition after this action, and update our local parameters
-        self.ti, self.bitmask = self.transition(action)
+        self.ti_left, self.ti_right, self.bitmask = self.transition(action)
 
         # Compute the dissimilarity metric
         d_sim = envs.utils.compute_dissimilarity(self.label, self.bitmask)
@@ -49,22 +54,23 @@ class Env(gym.Env):
 
     def transition(self, action: int) -> Tuple[int, np.ndarray]:
         # Compute the new threshold index and intensity
-        ti = self.ti + self.action_mapping[action]
-        th = self._intensity_spectrum[ti]
+        ti_left_u, ti_right_u = self.action_mapping[action]
+        ti_left, ti_right = self.ti_left + ti_left_u, self.ti_right + ti_right_u
+        th_left, th_right = self._intensity_spectrum[ti_left], self._intensity_spectrum[ti_right]
 
         # Compute the new bitmask
-        bitmask = envs.utils.apply_threshold(self.sample, th)
+        bitmask = envs.utils.apply_threshold(self.sample, th_left, th_right)
         bitmask = envs.utils.apply_opening(bitmask, self.opening)
 
-        return ti, bitmask
+        return ti_left, ti_right, bitmask
 
-    def reset(self, ti: Optional[int] = None) -> Tuple[Tuple[float, float, int], Dict[str, float]]:
+    def reset(self, ti: Optional[Tuple[int, int]] = None) -> Tuple[Tuple[float, float, int], Dict[str, float]]:
         # Pick random threshold intensity, or use the one specified by the user
-        self.ti = np.random.randint(0, self.n_thresholds) if ti is None else ti
-        th = self._intensity_spectrum[self.ti]
+        self.ti_left, self.ti_right = sorted(np.random.randint(0, self.n_thresholds, 2)) if ti is None else ti
+        th_left, th_right = self._intensity_spectrum[self.ti_left], self._intensity_spectrum[self.ti_right]
 
         # Compute the bitmask and compute the dissimilarity metric
-        self.bitmask = envs.utils.apply_threshold(self.sample, th)
+        self.bitmask = envs.utils.apply_threshold(self.sample, th_left, th_right)
         self.bitmask = envs.utils.apply_opening(self.bitmask, self.opening)
 
         self._d_sim_old = envs.utils.compute_dissimilarity(self.label, self.bitmask)
@@ -75,10 +81,16 @@ class Env(gym.Env):
         mask = np.zeros(self.action_space.n)
 
         for action in range(self.action_space.n):
-            ti = self.ti + self.action_mapping[action]
+            ti_left_u, ti_right_u = self.action_mapping[action]
+            ti_left, ti_right = self.ti_left + ti_left_u, self.ti_right + ti_right_u
 
             # Check if this action doesn't make the index go out of bounds
-            mask[action] = ti >= 0 and ti < self.n_thresholds
+            valid = ti_left >= 0 and ti_right >= 0 and ti_left < self.n_thresholds and ti_right < self.n_thresholds
+
+            # Check if this action doesn't make the left threshold higher than the right threshold
+            valid = valid and ti_left <= ti_right
+
+            mask[action] = valid
 
         return mask.astype(bool)
 
@@ -92,7 +104,7 @@ class Env(gym.Env):
                 continue
 
             # Perform a reversible transition
-            ti, bitmask = self.transition(action)
+            _, _, bitmask = self.transition(action)
 
             # Compute the dissimilarity metric
             d_sim = envs.utils.compute_dissimilarity(self.label, bitmask)

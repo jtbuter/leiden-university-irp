@@ -3,6 +3,7 @@ import numpy as np
 import gym
 
 import irp.policies.tiled_policy
+from irp.policies.mask_tiled_policy import MaskTiledQ
 
 class Sarsa():
     def __init__(self, environment: gym.Env):
@@ -13,34 +14,33 @@ class Sarsa():
     def learn(
         self,
         max_t: int, max_e: int, alpha: float,
-        ep_max: float = 1.0, ep_min: float = 0.1,
-        ep_frac: float = 0.0, gamma: float = 0.95, 
+        eps_max: float = 1.0, eps_min: float = 0.1,
+        eps_frac: float = 0.0, gamma: float = 0.95, 
         callback: Optional[Dict[str, any]] = None
     ):
-        self.policy = irp.policies.tiled_policy.TiledQ(self.environment.T.n_tiles, self.environment.action_space.n, alpha=alpha)
+        self.policy = MaskTiledQ(self.environment.T.n_tiles, self.environment.action_space.n, alpha=alpha)
 
-        t, e = 0, 0
-        ep = ep_max
-        continue_training = True
+        eps = eps_max
+        continue_training, time_exceeded = True, False
 
-        for e in range(max_e):
+        while self.e < max_e:
             state, info = self.environment.reset()
             done = False
 
-            if np.random.random() < ep:
+            if np.random.random() < eps:
                 action = self.environment.action_space.sample()
             else:
-                action = self.policy.predict(state)
+                action = self.policy.predict(state, self.environment.action_mask)
 
             while not done:
                 next_state, reward, done, info = self.environment.step(action)
                 
-                if np.random.random() < ep:
+                if np.random.random() < eps:
                     next_action = self.environment.action_space.sample()
                 else:
-                    next_action = self.policy.predict(next_state)
+                    next_action = self.policy.predict(next_state, self.environment.action_mask)
 
-                target = reward + gamma * self.policy.value(next_state, next_action) * (not done)
+                target = reward + gamma * self.policy.value(next_state, next_action)
 
                 self.policy.update(state, action, target)
 
@@ -48,14 +48,19 @@ class Sarsa():
 
                 self.t += 1
 
-            self.e = e + 1
+                time_exceeded = self.t >= max_t
 
-            ep = max(ep_min, ep - ep_frac)
+                if time_exceeded:
+                    break
 
-            if callback is not None and e % callback['interval'] == 0:
+            self.e += 1
+
+            eps = max(eps_min, eps - eps_frac)
+
+            if callback is not None and self.e % callback['interval'] == 0:
                 continue_training = callback['callback'](locals())
             
-            if continue_training is False:
+            if continue_training is False or time_exceeded:
                 break
 
         return self.policy
