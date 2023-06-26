@@ -21,6 +21,8 @@ class Tiled(gym.Wrapper):
 
         self._action_space = env.action_space
         self._tilings = tilings
+        
+        self.n_features = self.T.n_tiles
 
         self.env: gym.Env
 

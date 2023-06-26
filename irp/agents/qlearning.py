@@ -19,9 +19,10 @@ class Qlearning():
         max_t: int, max_e: int, alpha: float,
         eps_max: float = 1.0, eps_min: float = 0.1,
         eps_frac: float = 0.0, gamma: float = 0.95, 
-        callback: Optional[Dict[str, any]] = None
+        callback: Optional[Dict[str, any]] = None,
+        policy_cls = MaskTiledQ
     ):
-        self.policy = MaskTiledQ(self.environment.T.n_tiles, self.environment.action_space.n, alpha=alpha)
+        self.policy = policy_cls(self.environment.n_features, self.environment.action_space.n, alpha=alpha)
 
         eps = eps_max
         continue_training, time_exceeded = True, False

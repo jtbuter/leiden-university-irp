@@ -24,6 +24,7 @@ class Env(gym.Env):
         
         self.n_thresholds = len(self._intensity_spectrum)
         self.opening = opening
+        self.n_features = None
 
         self._d_sim_opt = irp.utils.get_best_dissimilarity(
             sample, label,

@@ -69,7 +69,7 @@ class UltraSoundEnv(gym.Env):
 
         # We found objects, but they are single pixels or lines
         if object_area == 0:
-            object_area = 1.0 # Counts number of non-zero pixels
+            object_area = 0.0 # Counts number of non-zero pixels
             # object_area = len(biggest_object) # Counts number of non-zero pixels
             compactness = 0.
         else:

@@ -16,7 +16,8 @@ def read_image(
 
 def read_sample(
     filename: str,
-    preprocess: Optional[bool] = True
+    preprocess: Optional[bool] = True,
+    median_size: Optional[int] = 7
 ) -> Tuple[np.ndarray, np.ndarray]:
     base_path = os.path.join(irp.ROOT_DIR, "../../data/trus/")
     image_path = os.path.join(base_path, 'images', filename)
@@ -25,9 +26,21 @@ def read_sample(
     sample, label = read_image(image_path), read_image(label_path)
 
     if preprocess:
-        sample = scipy.ndimage.median_filter(sample, 7)
+        sample = scipy.ndimage.median_filter(sample, median_size)
 
     return sample, label
+
+def stacked_read_sample(
+    *filenames: List[str],
+    preprocess: bool = True,
+    median_size: int = 7
+) -> List[Tuple[np.ndarray, np.ndarray]]:
+    samples = []
+
+    for filename in filenames:
+        samples.append(read_sample(filename, preprocess, median_size))
+
+    return samples
 
 def extract_coordinates(
     shape: Tuple[int, int],
