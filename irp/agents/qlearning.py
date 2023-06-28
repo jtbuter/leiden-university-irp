@@ -22,7 +22,7 @@ class Qlearning():
         callback: Optional[Dict[str, any]] = None,
         policy_cls = MaskTiledQ
     ):
-        self.policy = policy_cls(self.environment.n_features, self.environment.action_space.n, alpha=alpha)
+        self.policy = policy_cls(self.environment.n_features, self.environment.n_tiles, self.environment.action_space.n, alpha=alpha)
 
         eps = eps_max
         continue_training, time_exceeded = True, False

@@ -1,12 +1,15 @@
-from typing import Callable, Dict, Optional
+from typing import Callable, Dict, Optional, Union
 import numpy as np
 import gym
 
-import irp.policies.tiled_policy
+from irp.envs.env import Env
+from irp.wrappers.masking import ActionMasker
+from irp.wrappers.tiled import Tiled
+from irp.policies.tiled_policy import TiledQ
 from irp.policies.mask_tiled_policy import MaskTiledQ
 
 class Sarsa():
-    def __init__(self, environment: gym.Env):
+    def __init__(self, environment: Union[gym.Env, Env, ActionMasker, Tiled]):
         self.environment = environment
         self.t = 0
         self.e = 0
@@ -16,9 +19,10 @@ class Sarsa():
         max_t: int, max_e: int, alpha: float,
         eps_max: float = 1.0, eps_min: float = 0.1,
         eps_frac: float = 0.0, gamma: float = 0.95, 
-        callback: Optional[Dict[str, any]] = None
+        callback: Optional[Dict[str, any]] = None,
+        policy_cls = MaskTiledQ
     ):
-        self.policy = MaskTiledQ(self.environment.T.n_tiles, self.environment.action_space.n, alpha=alpha)
+        self.policy = policy_cls(self.environment.n_features, self.environment.n_tiles, self.environment.action_space.n, alpha=alpha)
 
         eps = eps_max
         continue_training, time_exceeded = True, False
@@ -34,7 +38,7 @@ class Sarsa():
 
             while not done:
                 next_state, reward, done, info = self.environment.step(action)
-                
+
                 if np.random.random() < eps:
                     next_action = self.environment.action_space.sample()
                 else:

@@ -2,14 +2,12 @@ from typing import Optional
 import numpy as np
 
 class TiledQ():
-    def __init__(self, n_features: int, n_actions: int, alpha: float):
+    def __init__(self, n_features: int, n_tiles: int, n_actions: int, alpha: float):
         self.w = np.zeros((n_features, n_actions))
 
         self._n_features = n_features
         self._n_actions = n_actions
-        self._alpha = alpha / n_features
-
-        self.w: np.ndarray
+        self._alpha = alpha / n_tiles
 
     def predict(self, state: np.ndarray, deterministic: Optional[bool] = False) -> int:
         values = self.values(state)

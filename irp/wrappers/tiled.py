@@ -20,9 +20,9 @@ class Tiled(gym.Wrapper):
         self._observation_space = gym.spaces.MultiDiscrete(nvec=(1,) * tilings)
 
         self._action_space = env.action_space
-        self._tilings = tilings
         
-        self.n_features = self.T.n_tiles
+        self.n_tiles = tilings
+        self.n_features = self.T.n_features
 
         self.env: gym.Env
 

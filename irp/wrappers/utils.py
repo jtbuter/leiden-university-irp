@@ -38,7 +38,8 @@ class TileCoder:
         self._tile_base_ind = np.prod(tiling_dims) * np.arange(tilings)
         self._hash_vec = np.array([np.prod(tiling_dims[0:i]) for i in range(len(tiles_per_dim))])
         self._tiling_dims = np.array(np.ceil(tiles_per_dim), dtype=np.int)
-        self._n_tiles = tilings * np.prod(tiling_dims)
+        self._n_tiles = tilings
+        self._n_features = tilings * np.prod(tiling_dims)
 
     def __getitem__(self, x: Tuple[Union[float, int], ...]) -> np.ndarray:
         x = np.clip(x, self._limits[:, 0], self._limits[:, 1])
@@ -49,6 +50,10 @@ class TileCoder:
     @property
     def n_tiles(self) -> int:
         return self._n_tiles
+
+    @property
+    def n_features(self) -> int:
+        return self._n_features
 
 """
 Tile Coding Software version 3.0beta

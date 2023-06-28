@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import irp
 import irp.envs as envs
 
+from irp.envs.sahba_env import Env
+
 def read_image(
     path: str
 ) -> np.ndarray:
@@ -61,29 +63,46 @@ def extract_coordinates(
     return coords
 
 def evaluate(environment: gym.Env, policy, max_steps: Optional[int] = 10, wait_for_done: Optional[bool] = False) -> Tuple[float, bool, np.ndarray]:
-    done = False
-    state, info = environment.reset(ti=(0, 0))
-    tis = [environment.ti]
-    bitmask = environment.bitmask.copy()
-    is_done = False
+    opt_state = None
+    state, info = tuple(environment.reset(ti=0, vi=0))
 
-    for t in range(max_steps):
-        action = policy.predict(state, lambda: environment.action_mask())
+    states = []
+    configs = []
+    values = []
+
+    for i in range(max_steps):
+        max_q_val = max(policy.values(state)[environment.action_mask()])
+        config = environment.configuration
+
+        states.append(tuple(state))
+        values.append(max_q_val)
+        configs.append(config)
+
+        # As long as we haven't seen the real terminal state yet, there's no need to check for cycles
+        if opt_state is not None:
+            # simple_states = simplify_sequence(states, states)
+            cycle = find_repeating_path(states)
+
+            if cycle:
+                states = np.asarray(states)
+                values = np.asarray(values)
+                configs = np.asarray(configs)
+
+                predicted_state = states[cycle[0] + np.argmin(values[cycle])]
+
+                print('\n'.join(list(map(str, states[cycle].tolist()))))
+                print('\n'.join(list(map(str, configs[cycle].tolist()))))
+                print(values[cycle])
+
+                return tuple(predicted_state) == opt_state
+
+        action = policy.predict(state, environment.action_mask)
         state, reward, done, info = environment.step(action)
 
-        tis.append(environment.ti)
+        if done:
+            opt_state = tuple(state)
 
-        if is_oscilating(tis) is True:
-            break
-        elif tis[-1] == tis[-2]:
-            is_done = done
-
-            break
-
-        bitmask = environment.bitmask.copy()
-        is_done = done
-
-    return info['d_sim'], is_done, bitmask
+    return False
 
 def extract_subimages(
     *samples: np.ndarray,
@@ -377,7 +396,7 @@ def find_repeating_path(sequence):
         if item not in seen:
             seen.append(item)
         else:
-            return list(range(seen.index(item), i + 1))
+            return list(range(seen.index(item), i + 1)) # TODO: Checken of `i + 1` veranderd kan in `i`
 
         i += 1
 
@@ -395,3 +414,14 @@ def simplify_sequence(states, values):
         i += 1
 
     return simple_sequence
+
+def construct_environment(sample: np.ndarray, label: np.ndarray, wrappers: List, parameters: List):
+    environment = Env(sample, label, **parameters[0])
+
+    for wrapper, params in zip(wrappers, parameters[1:]):
+        environment = wrapper(environment, **params)
+
+    return environment
+
+def cantor_pairing(a: int, b: int) -> int:
+    return int((a + b) * (a + b + 1) / 2 + a)
