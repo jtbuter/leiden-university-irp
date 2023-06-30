@@ -43,8 +43,8 @@ class Env(gym.Env):
         d_sim = envs.utils.compute_dissimilarity(self.label, self.bitmask)
 
         # Did we improve the dissimilarity compared to the previous timestep
-        # if d_sim <= self._d_sim_opt:
-        if d_sim < self._d_sim_old:
+        if d_sim <= self._d_sim_opt:
+        # if d_sim < self._d_sim_old:
             reward = 1
         else:
             reward = -1

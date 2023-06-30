@@ -19,7 +19,7 @@ def eval(locals_):
     print(irp.utils.evaluate(instance.environment, instance.policy))
 
 callback = {
-    'interval': 100,
+    'interval': 10,
     'callback': eval
 }
 
@@ -34,30 +34,30 @@ neighborhood_parameters = {
     'neighborhood': 'neumann'
 }
 tiling_parameters = {
-    'tiles_per_dim': (8, 8, 8),
+    'tiles_per_dim': (4, 4, 2),
     'tilings': 64,
-    'limits': [(0, 1), (0, 1), (0, 32)]
+    'limits': [(0, 1), (0, 1), (0, 4)]
 }
 agent_parameters = {
-    'alpha': 0.2,
+    'alpha': 0.8,
     'max_t': np.inf,
     'max_e': 2000,
     'eps_max': 0.6,
     'eps_min': 0.6,
     'eps_frac': 0.001,
-    'gamma': 0.99,
+    'gamma': 0.95,
     'callback': callback
 }
 environment_parameters = {
     'n_thresholds': 6,
-    'openings': [0, 2, 5]
+    'openings': [0]
 }
 
-(image, truth), (t_image, t_truth) = irp.utils.read_sample('case10_10.png', median_size=7), irp.utils.read_sample('case10_11.png', median_size=7)
+(image, truth), (t_image, t_truth) = irp.utils.stacked_read_sample('case10_10.png', 'case10_11.png', median_size=7)
 subimages, sublabels, t_subimages, t_sublabels = irp.utils.extract_subimages(
     image, truth, t_image, t_truth, **image_parameters
 )
-coord = (320, 272)
+coord = (256, 224)
 
 sample_id = irp.utils.coord_to_id(coord, image.shape, **image_parameters)
 sample, label = subimages[sample_id], sublabels[sample_id]
@@ -67,7 +67,21 @@ environment = Env(sample, label, **environment_parameters)
 environment = Tiled(environment, **tiling_parameters)
 environment = ActionMasker(environment)
 
+t_environment = Env(t_sample, t_label, **environment_parameters)
+t_environment = Tiled(t_environment, **tiling_parameters)
+t_environment = ActionMasker(t_environment)
+
 agent = Qlearning(environment)
 policy = agent.learn(**agent_parameters)
 
-print(irp.utils.evaluate(environment, policy))
+state, info = t_environment.reset(ti=0, vi=0)
+
+for i in range(10):
+    print(policy.values(state)[t_environment.action_mask()])
+
+    action = policy.predict(state, t_environment.action_mask, deterministic=True)
+    state, reward, done, info = t_environment.step(action)
+
+    print(done, info)
+
+    irp.utils.show(t_environment.bitmask)

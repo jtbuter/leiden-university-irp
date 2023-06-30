@@ -23,13 +23,13 @@ environment_parameters = {
     'n_thresholds': 7
 }
 
-(image, truth), (t_image, t_truth), (p_image, p_truth) = irp.utils.stacked_read_sample('case10_10.png', 'case10_11.png', 'case10_12.png', median_size=7)
+(image, truth), (t_image, t_truth), (p_image, p_truth) = irp.utils.stacked_read_sample('case10_10.png', 'case10_11.png', 'case10_12.png', median_size=15)
 
 # (image, truth), (t_image, t_truth), = irp.utils.read_sample('case10_10.png', median_size=15), irp.utils.read_sample('case10_11.png', median_size=15)
 subimages, sublabels, t_subimages, t_sublabels, p_subimages, p_sublabels = irp.utils.extract_subimages(
     image, truth, t_image, t_truth, p_image, p_truth, **image_parameters
 )
-coords = [(320, 272)]
+coords = [(256, 224)]
 
 fig, axes = plt.subplots(nrows=3, ncols=environment_parameters['n_thresholds'] + 2)
 
@@ -40,10 +40,10 @@ for sample_coord in coords:
     sample, label = subimages[sample_id], sublabels[sample_id]
     intensity_spectrum = irp.envs.utils.get_intensity_spectrum(sample, **environment_parameters, add_minus=True)
 
-    best_dissim, sequence = irp.utils.get_best_dissimilarity(sample, label, [intensity_spectrum, [8]], [irp.envs.utils.apply_threshold, irp.envs.utils.apply_opening], return_seq=True)
+    best_dissim, sequence = irp.utils.get_best_dissimilarity(sample, label, [intensity_spectrum, [0]], [irp.envs.utils.apply_threshold, irp.envs.utils.apply_opening], return_seq=True)
 
     for i, intensity in enumerate(intensity_spectrum):
-        bitmask = irp.utils.apply_action_sequence(sample, (intensity, 8), [irp.envs.utils.apply_threshold, irp.envs.utils.apply_opening])
+        bitmask = irp.utils.apply_action_sequence(sample, (intensity, 0), [irp.envs.utils.apply_threshold, irp.envs.utils.apply_opening])
         dissim = irp.envs.utils.compute_dissimilarity(label, bitmask)
 
         # if i == irp.utils.indexof(sequence[0], intensity_spectrum):

@@ -63,7 +63,15 @@ def extract_coordinates(
     return coords
 
 def evaluate(environment: gym.Env, policy, max_steps: Optional[int] = 10, wait_for_done: Optional[bool] = False) -> Tuple[float, bool, np.ndarray]:
-    opt_state = None
+    opt_states = []
+
+    for ti in range(len(environment.intensity_spectrum)):
+        for vj in range(len(environment.openings)):
+            state, info = environment.reset(ti=ti, vi=vj)
+
+            if info['d_sim'] == environment.d_sim_opt:
+                opt_states.append(tuple(state))
+
     state, info = tuple(environment.reset(ti=0, vi=0))
 
     states = []
@@ -78,29 +86,20 @@ def evaluate(environment: gym.Env, policy, max_steps: Optional[int] = 10, wait_f
         values.append(max_q_val)
         configs.append(config)
 
-        # As long as we haven't seen the real terminal state yet, there's no need to check for cycles
-        if opt_state is not None:
-            # simple_states = simplify_sequence(states, states)
-            cycle = find_repeating_path(states)
+        cycle = find_repeating_path(configs)
 
-            if cycle:
-                states = np.asarray(states)
-                values = np.asarray(values)
-                configs = np.asarray(configs)
+        if cycle:
+            states = np.asarray(states)
+            values = np.asarray(values)
+            configs = np.asarray(configs)
 
-                predicted_state = states[cycle[0] + np.argmin(values[cycle])]
+            predicted_state = tuple(states[cycle[0] + np.argmin(values[cycle])])
+            found = predicted_state in opt_states
 
-                print('\n'.join(list(map(str, states[cycle].tolist()))))
-                print('\n'.join(list(map(str, configs[cycle].tolist()))))
-                print(values[cycle])
-
-                return tuple(predicted_state) == opt_state
+            return found
 
         action = policy.predict(state, environment.action_mask)
         state, reward, done, info = environment.step(action)
-
-        if done:
-            opt_state = tuple(state)
 
     return False
 
