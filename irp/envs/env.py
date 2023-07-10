@@ -13,6 +13,9 @@ from irp.envs.base_env import UltraSoundEnv
 class Env(gym.Env):
     # Define how parameters can be modified, and remove the neutral action
     action_mapping = list(itertools.product([-1, 1, 0], [-1, 1, 0])); action_mapping.remove((0, 0))
+    
+    # The number of features the state-vector consists of
+    n_features = 3
 
     def __init__(self, sample: np.ndarray, label: np.ndarray, n_thresholds: int, opening: Optional[int] = 0):
         self.sample = sample
@@ -24,7 +27,6 @@ class Env(gym.Env):
         
         self.n_thresholds = len(self._intensity_spectrum)
         self.opening = opening
-        self.n_features = None
 
         self._d_sim_opt = irp.utils.get_best_dissimilarity(
             sample, label,

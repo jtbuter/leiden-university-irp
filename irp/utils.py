@@ -173,7 +173,7 @@ def coord_to_id(
     height, width = shape
     i = 0
 
-    if isinstance(overlap, float):
+    if isinstance(overlap, float) or isinstance(overlap, int):
         width_step_size = int(round((1 - overlap) * subimage_width, 0))
         height_step_size = int(round((1 - overlap) * subimage_height, 0))
     elif isinstance(overlap, tuple):
