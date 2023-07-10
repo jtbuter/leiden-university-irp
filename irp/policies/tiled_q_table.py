@@ -2,12 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 class TiledQ():
-    def __init__(self, n_features: int, n_actions: int, alpha: float):
+    def __init__(self, n_features: int, tilings: int, n_actions: int, alpha: float):
         self.w = np.zeros((n_features, n_actions))
 
         self._n_features = n_features
         self._n_actions = n_actions
-        self._alpha = alpha / n_features
+        self._alpha = alpha / tilings
 
         self.w: np.ndarray
 

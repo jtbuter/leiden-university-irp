@@ -53,7 +53,7 @@ for coord in coords:
     environment = Env(sample, label, n_thresholds=n_thresholds)
     environment = Tiled(environment, tiles_per_dim, tilings, limits)
     
-    policy = TiledQ(environment.T.n_features, environment.action_space.n, alpha)
+    policy = TiledQ(environment.T.n_features, tilings, environment.action_space.n, alpha)
     
     t = 0
     ep = 1
@@ -65,7 +65,10 @@ for coord in coords:
 
         for _ in range(15): # Perform 15 timesteps
             next_state, reward, done, info = environment.step(action)
-            next_action = policy.predict(next_state)
+
+            if np.random.random() < ep: next_action = environment.action_space.sample()
+            else: policy.predict(next_state)
+
             target = reward + gamma * policy.value(next_state, next_action)
 
             policy.update(state, action, target)

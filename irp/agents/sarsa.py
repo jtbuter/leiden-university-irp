@@ -51,6 +51,8 @@ class Sarsa():
                 state, action = next_state, next_action
 
                 self.t += 1
+                
+                eps = max(eps_min, eps * eps_frac)
 
                 time_exceeded = self.t >= max_t
 
@@ -58,8 +60,6 @@ class Sarsa():
                     break
 
             self.e += 1
-
-            eps = max(eps_min, eps - eps_frac)
 
             if callback is not None and self.e % callback['interval'] == 0:
                 continue_training = callback['callback'](locals())

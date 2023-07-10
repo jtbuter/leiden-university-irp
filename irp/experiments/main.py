@@ -1,56 +1,49 @@
-import itertools
+import os
 import numpy as np
 import matplotlib.pyplot as plt
+import sklearn.metrics
 
 import irp.utils
-import irp.wrappers as wrappers
-import irp.envs as envs
 
 from irp.envs.env import Env
 from irp.agents.sarsa import Sarsa
-from irp.agents.qlearning import Qlearning
 from irp.wrappers.tiled import Tiled
-from irp.wrappers.multi_sample import MultiSample
+from irp.wrappers.masking import ActionMasker
 
-def eval(local_vars):
-    results.append(irp.utils.evaluate(environment, local_vars['self'].policy, max_steps=10)[0])
-    
-    return True
+def evaluate(environment: Tiled, policy, steps: int = 10, ti: int = None):
+    state, info = environment.reset(ti=ti)
 
-    N = 50
+    for i in range(steps):
+        action = policy.predict(state, environment.action_mask, deterministic=True)
+        state, reward, done, info = environment.step(action)
 
-    return not (np.mean(results[-N:]) > 0.95 and len(results[-N:]) == N)
-
-callback = {'interval': 10, 'callback': eval}
+    return info['d_sim']
 
 image_parameters = {
-    'subimage_width': 32,
-    'subimage_height': 16,
-    'overlap': 0.5
-}
-neighborhood_parameters = {
-    'n_size': 1,
-    'overlap': image_parameters['overlap'],
-    'neighborhood': 'neumann'
+    'subimage_width': 16,
+    'subimage_height': 8,
+    'overlap': 0
 }
 tiling_parameters = {
     'tiles_per_dim': (2, 2, 2),
     'tilings': 64,
-    'limits': [(0, 1), (0, 1), (0, 4)]
+    'limits': [(0, 1), (0, 1), (0, 32)]
 }
 agent_parameters = {
-    'alpha': 0.6,
-    'max_t': 1000,
-    'max_e': 3000,
-    'eps_max': 0.6,
-    'eps_min': 0.6,
-    'eps_frac': 0.01,
-    'gamma': 0.8,
+    'alpha': 0.2,
+    'max_t': 5000,
+    'max_e': np.inf,
+    'eps_max': 1.0,
+    'eps_min': 0.3,
+    'eps_frac': 0.999,
+    'gamma': 0.95,
 }
 environment_parameters = {
-    'n_thresholds': 6,
-    'opening': 8
+    'n_thresholds': 4,
+    'opening': 0
 }
+
+real = irp.utils.read_image(os.path.join(irp.GIT_DIR, '../data/trus/labels/case10_11.png'))
 
 (image, truth), (t_image, t_truth) = irp.utils.read_sample('case10_10.png'), irp.utils.read_sample('case10_11.png')
 subimages, sublabels, t_subimages, t_sublabels = irp.utils.extract_subimages(
@@ -58,75 +51,38 @@ subimages, sublabels, t_subimages, t_sublabels = irp.utils.extract_subimages(
 )
 
 result = np.zeros((512, 512))
-coords = irp.utils.extract_coordinates(image.shape, **dict(image_parameters, **{'overlap': 0}))
-coords = [(224, 272)]
+coords = irp.utils.extract_coordinates(image.shape, **image_parameters)
 main_area_start = None
 
 for coord in coords:
-    result = np.zeros((2 * 8 + 16, 2 * 16 + 32))
+    x, y = coord
 
-    orig_sample_coord = (224, 272)
-    sample_coord = orig_sample_coord
-    neighborhood = irp.utils.get_neighborhood_images(subimages, sublabels, sample_coord, **dict(image_parameters, **neighborhood_parameters))
-    neighborhood_coords = irp.utils.get_neighborhood(orig_sample_coord, image.shape, **dict(image_parameters, **neighborhood_parameters))
+    # Don't waste processing power for now (TODO: dit verwijderen voor uiteindelijke report resultaten)
+    if not (x >= 192 and x <= 336 and y >= 176 and y <= 288):
+        continue
 
-    for (sample, label), n_coord in zip(zip(*neighborhood), neighborhood_coords):
-        results = []
+    sample_id = irp.utils.coord_to_id(coord, image.shape, **image_parameters)
+    sample, label = subimages[sample_id], sublabels[sample_id]
 
-        sample_id = irp.utils.coord_to_id(n_coord, image.shape, **image_parameters)
-        sample, label = subimages[sample_id], sublabels[sample_id]
-        t_sample, t_label = t_subimages[sample_id], t_sublabels[sample_id]
+    environment = Env(sample, label, **environment_parameters)
+    environment = Tiled(environment, **tiling_parameters)
+    environment = ActionMasker(environment)
 
-        environment = Env(sample, label, **environment_parameters)
-        environment = Tiled(environment, **tiling_parameters)
+    agent = Sarsa(environment)
+    policy = agent.learn(**agent_parameters)
 
-        t_environment = Env(t_sample, t_label, **environment_parameters)
-        t_environment = Tiled(t_environment, **tiling_parameters)
+    t_sample, t_label = t_subimages[sample_id], t_sublabels[sample_id]
+    t_environment = Env(t_sample, t_label, **environment_parameters)
+    t_environment = Tiled(t_environment, **tiling_parameters)
+    t_environment = ActionMasker(t_environment)
 
-        agent = Qlearning(environment)
-        policy = agent.learn(callback=callback, **agent_parameters)
+    d_sim = evaluate(t_environment, policy, ti=0)
 
-        if agent.e < agent_parameters['max_e']:
-            print('Finished within the maximum number of episodes;', agent.e)
+    print(coord, d_sim, t_environment.d_sim_opt)
 
-        # N = 10
-        # plt.plot(np.convolve(results, np.ones(N) / N, mode='same')); plt.show()
+    result[y:y+image_parameters['subimage_height'], x:x+image_parameters['subimage_width']] = t_environment.bitmask
 
-        tis = []
-        done = False
-        state, info = t_environment.reset(ti=0)
-        tis.append(t_environment.ti)
-        bitmask = t_environment.bitmask.copy()
+print(sklearn.metrics.f1_score((real / 255).astype(bool).flatten(), (result / 255).astype(bool).flatten()))
 
-        for i in range(10):
-            action = policy.predict(state)
-            state, reward, done, info = t_environment.step(action)
-
-            tis.append(t_environment.ti)
-
-            if irp.utils.is_oscilating(tis) is True or tis[-1] == tis[-2]:
-                break
-
-            bitmask = t_environment.bitmask.copy()
-
-        print('Threshold history', tis)
-        print('Dissimilarity v.s. optimal dissimilarity', envs.utils.compute_dissimilarity(t_environment.label, bitmask), t_environment.d_sim)
-
-        best_sequence = irp.utils.get_best_dissimilarity(t_sample, t_label, [t_environment.intensity_spectrum, [8]], [envs.utils.apply_threshold, envs.utils.apply_opening], return_seq=True)[1]
-        best_bitmask = irp.utils.apply_action_sequence(t_sample, best_sequence, [envs.utils.apply_threshold, envs.utils.apply_opening])
-
-        normalized_coord = irp.utils.normalize_coord(sample_coord, n_coord, 16, 8)
-        x, y = normalized_coord
-
-        if sample_coord[0] == orig_sample_coord[0] and sample_coord[1] == orig_sample_coord[1]:
-            main_area_start = (x, y)
-
-        result[y:y+16,x:x+32] = sublabels[sample_id]
-
-        # irp.utils.show(bitmask, best_bitmask, t_label)
-
-irp.utils.show(
-    result[
-        main_area_start[1]:main_area_start[1] + 16, main_area_start[0]:main_area_start[0] + 32
-    ]
-)
+plt.imshow(result, cmap='gray', vmin=0, vmax=1)
+plt.show()
