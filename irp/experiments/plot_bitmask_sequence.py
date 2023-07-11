@@ -10,8 +10,8 @@ from irp.envs.base_env import UltraSoundEnv
 from irp.envs.env import Env
 
 image_parameters = {
-    'subimage_width': 32,
-    'subimage_height': 16,
+    'subimage_width': 16,
+    'subimage_height': 8,
     'overlap': 0.5
 }
 neighborhood_parameters = {
@@ -20,16 +20,16 @@ neighborhood_parameters = {
     'neighborhood': 'neumann'
 }
 environment_parameters = {
-    'n_thresholds': 7
+    'n_thresholds': 4
 }
 
-(image, truth), (t_image, t_truth), (p_image, p_truth) = irp.utils.stacked_read_sample('case10_10.png', 'case10_11.png', 'case10_12.png', median_size=15)
+(image, truth), (t_image, t_truth), (p_image, p_truth) = irp.utils.stacked_read_sample('case10_10.png', 'case10_11.png', 'case10_12.png', median_size=7)
 
 # (image, truth), (t_image, t_truth), = irp.utils.read_sample('case10_10.png', median_size=15), irp.utils.read_sample('case10_11.png', median_size=15)
 subimages, sublabels, t_subimages, t_sublabels, p_subimages, p_sublabels = irp.utils.extract_subimages(
     image, truth, t_image, t_truth, p_image, p_truth, **image_parameters
 )
-coords = [(256, 224)]
+coords = [(272, 176)]
 
 fig, axes = plt.subplots(nrows=3, ncols=environment_parameters['n_thresholds'] + 2)
 
@@ -65,10 +65,12 @@ for sample_coord in coords:
 
     for i, intensity in enumerate(t_intensity_spectrum):
         bitmask = irp.utils.apply_action_sequence(t_sample, (intensity, 0), [irp.envs.utils.apply_threshold, irp.envs.utils.apply_opening])
+        dissim = irp.envs.utils.compute_dissimilarity(t_label, bitmask)
 
         # if i == irp.utils.indexof(sequence[0], t_intensity_spectrum):
         #     axes[1][i + 1].title.set_text('*')
 
+        axes[1][i].title.set_text(round(dissim, 3))
         axes[1][i].imshow(bitmask, cmap='gray', interpolation='none', vmin=0, vmax=1)
         axes[1][i].set_xticks([])
         axes[1][i].set_yticks([])

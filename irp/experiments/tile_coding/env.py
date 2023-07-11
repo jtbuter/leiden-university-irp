@@ -21,7 +21,7 @@ class Env(gym.Env):
         
         self.n_thresholds = n_thresholds + 1
 
-        self._d_sim = irp.utils.get_best_dissimilarity(sample, label, [self._intensity_spectrum], [envs.utils.apply_threshold])
+        self._d_sim_opt = irp.utils.get_best_dissimilarity(sample, label, [self._intensity_spectrum], [envs.utils.apply_threshold])
 
     def step(self, action: int):
         # Update the threshold index
@@ -35,7 +35,7 @@ class Env(gym.Env):
         d_sim = envs.utils.compute_dissimilarity(self.bitmask, self.label)
 
         # We're done if we at least match the previous best dissimilarity
-        done = d_sim <= self._d_sim
+        done = d_sim <= self._d_sim_opt
 
         # Did we reach the best possible dissimilarity
         if done:
@@ -56,8 +56,8 @@ class Env(gym.Env):
         return UltraSoundEnv.observation(self.bitmask)
 
     @property
-    def d_sim(self):
-        return self._d_sim
+    def d_sim_opt(self):
+        return self._d_sim_opt
 
     @property
     def intensity_spectrum(self):

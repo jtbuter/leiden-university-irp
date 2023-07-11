@@ -1,3 +1,4 @@
+from irp.envs.utils import compute_dissimilarity
 import os
 from typing import Optional
 import matplotlib.pyplot as plt
@@ -24,11 +25,15 @@ def evaluate(environment: Tiled, policy: TiledQ, steps: int = 10, ti: Optional[i
 
 real = irp.utils.read_image(os.path.join(irp.GIT_DIR, '../data/trus/labels/case10_11.png'))
 
-s_width, s_height, overlap, n_size = 16, 8, 0, 1 # Define characteristics for the training and testing samples
+image_parameters = {
+    'subimage_width': 16,
+    'subimage_height': 8,
+    'overlap': 0
+}
 
 (image, label), (t_image, t_label) = irp.utils.stacked_read_sample('case10_10.png', 'case10_11.png')
 subimages, sublabels, t_subimages, t_sublabels = irp.utils.extract_subimages(
-    image, label, t_image, t_label, subimage_width=s_width, subimage_height=s_height, overlap=overlap
+    image, label, t_image, t_label, **image_parameters
 )
 
 n_thresholds, tiles_per_dim, tilings, limits = 4, (2, 2, 2), 64, [(0, 1), (0, 1), (0, 32)] # Characteristics for tile-coding
@@ -37,14 +42,15 @@ gamma = 0.95
 ep_frac = 0.999
 ep_min = 0.3
 
-coords = irp.utils.extract_coordinates((512, 512), s_width, s_height, 0)
+coords = irp.utils.extract_coordinates(image.shape, **image_parameters)
+# coords = [(272, 176), (256, 184), (288, 184), (272, 192)]
 
-result = np.zeros((512, 512))
+result = np.zeros(image.shape)
 failed = []
 
 for coord in coords:
     x, y = coord
-    index = irp.utils.coord_to_id(coord, (512, 512), s_width, s_height, overlap)
+    index = irp.utils.coord_to_id(coord, image.shape, **image_parameters)
 
     if not (x >= 192 and x <= 336 and y >= 176 and y <= 288):
         continue
@@ -60,14 +66,20 @@ for coord in coords:
 
     while t < 5000: # Perform `n` total timesteps
         state = environment.reset()
-        if np.random.random() < ep: action = environment.action_space.sample()
-        else: action = policy.predict(state)
+        done = False
 
-        for _ in range(15): # Perform 15 timesteps
+        if np.random.random() < ep:
+            action = environment.action_space.sample()
+        else:
+            action = policy.predict(state)
+
+        while not done:
             next_state, reward, done, info = environment.step(action)
 
-            if np.random.random() < ep: next_action = environment.action_space.sample()
-            else: policy.predict(next_state)
+            if np.random.random() < ep:
+                next_action = environment.action_space.sample()
+            else:
+                next_action = policy.predict(next_state)
 
             target = reward + gamma * policy.value(next_state, next_action)
 
@@ -86,12 +98,12 @@ for coord in coords:
 
     d_sim = evaluate(t_environment, policy, ti=0)
 
-    print(coord, d_sim, t_environment.d_sim)
+    print(coord, d_sim, t_environment.d_sim_opt)
 
-    if not np.isclose(d_sim, t_environment.d_sim):
+    if not np.isclose(d_sim, t_environment.d_sim_opt):
         failed.append(coord)
 
-    result[y:y+s_height, x:x+s_width] = t_environment.bitmask
+    result[y:y+image_parameters['subimage_height'], x:x+image_parameters['subimage_width']] = t_environment.bitmask
 
 print(failed)
 print(sklearn.metrics.f1_score((real / 255).astype(bool).flatten(), (result / 255).astype(bool).flatten()))
