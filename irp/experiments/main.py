@@ -7,6 +7,7 @@ import irp.utils
 
 from irp.envs.env import Env
 from irp.agents.sarsa import Sarsa
+from irp.agents.qlearning import Qlearning
 from irp.wrappers.tiled import Tiled
 from irp.wrappers.masking import ActionMasker
 

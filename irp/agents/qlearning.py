@@ -38,13 +38,17 @@ class Qlearning():
                     action = self.policy.predict(state, self.environment.action_mask)
 
                 next_state, reward, done, info = self.environment.step(action)
-                target = reward + gamma * max(self.policy.values(next_state))
+                
+                next_actions = self.policy.values(next_state)[self.environment.action_mask()]
+                target = reward + gamma * max(next_actions)
 
                 self.policy.update(state, action, target)
 
                 state = next_state
 
                 self.t += 1
+                
+                eps = max(eps_min, eps * eps_frac)
 
                 time_exceeded = self.t >= max_t
 
@@ -52,8 +56,6 @@ class Qlearning():
                     break
 
             self.e += 1
-
-            eps = max(eps_min, eps - eps_frac)
 
             if callback is not None and self.e % callback['interval'] == 0:
                 continue_training = callback['callback'](locals())
