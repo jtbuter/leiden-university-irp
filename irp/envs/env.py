@@ -30,8 +30,8 @@ class Env(gym.Env):
 
         self._d_sim_opt = irp.utils.get_best_dissimilarity(
             sample, label,
-            [self._intensity_spectrum],
-            [envs.utils.apply_threshold]
+            [self._intensity_spectrum, [opening]],
+            [envs.utils.apply_threshold, envs.utils.apply_opening]
         )
 
     def step(self, action: int) -> Tuple[Tuple[float, float, int], int, bool, Dict[str, float]]:
@@ -63,6 +63,7 @@ class Env(gym.Env):
 
         # Compute the new bitmask
         bitmask = envs.utils.apply_threshold(self.sample, th_left)
+        bitmask = envs.utils.apply_opening(bitmask, self.opening)
 
         return ti_left, bitmask
 
@@ -73,6 +74,7 @@ class Env(gym.Env):
 
         # Compute the bitmask and compute the dissimilarity metric
         self.bitmask = envs.utils.apply_threshold(self.sample, th_left)
+        self.bitmask = envs.utils.apply_opening(self.bitmask, self.opening)
 
         self._d_sim_old = envs.utils.compute_dissimilarity(self.label, self.bitmask)
 

@@ -36,7 +36,7 @@ subimages, sublabels, t_subimages, t_sublabels = irp.utils.extract_subimages(
     image, label, t_image, t_label, **image_parameters
 )
 
-n_thresholds, tiles_per_dim, tilings, limits = 4, (2, 2, 2), 64, [(0, 1), (0, 1), (0, 32)] # Characteristics for tile-coding
+n_thresholds, tiles_per_dim, tilings, limits = 5, (2, 2, 2), 64, [(0, 1), (0, 1), (0, 32)] # Characteristics for tile-coding
 alpha = 0.2
 gamma = 0.95
 ep_frac = 0.999

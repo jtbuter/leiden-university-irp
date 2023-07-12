@@ -39,7 +39,7 @@ agent_parameters = {
     'gamma': 0.95,
 }
 environment_parameters = {
-    'n_thresholds': 4,
+    'n_thresholds': 5,
     'opening': 0
 }
 
@@ -50,7 +50,7 @@ subimages, sublabels, t_subimages, t_sublabels = irp.utils.extract_subimages(
     image, truth, t_image, t_truth, **image_parameters
 )
 
-result = np.zeros((512, 512))
+result = np.zeros(image.shape)
 coords = irp.utils.extract_coordinates(image.shape, **image_parameters)
 main_area_start = None
 
