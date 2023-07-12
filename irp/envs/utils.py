@@ -77,7 +77,7 @@ def get_intensity_spectrum(
 def compute_dissimilarity(
     label: np.ndarray,
     bitmask: np.ndarray,
-    fn: Callable = lambda x, y: (x == y).sum() / (y.size + 1e-6)
+    fn: Callable = lambda x, y: (x == y).sum() / (y.size)
 ) -> float:
     return 1 - fn(label, bitmask)
 

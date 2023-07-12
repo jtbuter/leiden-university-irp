@@ -39,8 +39,9 @@ class Qlearning():
 
                 next_state, reward, done, info = self.environment.step(action)
                 
-                next_actions = self.policy.values(next_state)[self.environment.action_mask()]
-                target = reward + gamma * max(next_actions)
+                # Environment has already transitioned to s', i.e., the action mask can be used
+                next_state_values = self.policy.values(next_state)[self.environment.action_mask()]
+                target = reward + gamma * max(next_state_values)
 
                 self.policy.update(state, action, target)
 

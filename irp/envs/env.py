@@ -17,7 +17,7 @@ class Env(gym.Env):
     # The number of features the state-vector consists of
     n_features = 3
 
-    def __init__(self, sample: np.ndarray, label: np.ndarray, n_thresholds: int, opening: Optional[int] = 0):
+    def __init__(self, sample: np.ndarray, label: np.ndarray, n_thresholds: int, opening: Optional[int] = 0, sahba: Optional[bool] = True):
         self.sample = sample
         self.label = label
 
@@ -27,6 +27,7 @@ class Env(gym.Env):
         
         self.n_thresholds = len(self._intensity_spectrum)
         self.opening = opening
+        self.sahba = sahba
 
         self._d_sim_opt = irp.utils.get_best_dissimilarity(
             sample, label,
@@ -41,22 +42,34 @@ class Env(gym.Env):
         # Compute the dissimilarity metric
         d_sim = envs.utils.compute_dissimilarity(self.label, self.bitmask)
 
-        # Did we improve the dissimilarity compared to the previous timestep
-        if d_sim <= self._d_sim_opt:
-            reward = 1
-        else:
-            reward = -1
+        # Determine the reward based on the achieved dissimilarity
+        reward = self.reward(d_sim)
+
+        self._d_sim_old = d_sim
 
         # We're done if we match the best dissimilarity
         done = d_sim <= self._d_sim_opt
 
-        return UltraSoundEnv.observation(self.bitmask), reward, done, {'d_sim': d_sim}
+        # Expose the internal configuration and obtained dissimilarity
+        info = {
+            'd_sim': d_sim,
+            'configuration': (self.ti_left,)
+        }
+
+        return UltraSoundEnv.observation(self.bitmask), reward, done, info
+
+    def reward(self, d_sim: float):
+        if self.sahba:
+            return 10 if d_sim < self._d_sim_old else 0
+        else:
+            return 1 if d_sim <= self._d_sim_opt else -1
 
     def transition(self, action: int) -> Tuple[int, np.ndarray]:
         # Compute the new threshold index and intensity
         ti_left_u = self.action_mapping[action]
         ti_left = self.ti_left + ti_left_u
 
+        # Avoid out-of-bounds index
         ti_left = min(max(0, ti_left), self.n_thresholds - 1)
 
         th_left = self._intensity_spectrum[ti_left]
@@ -76,9 +89,17 @@ class Env(gym.Env):
         self.bitmask = envs.utils.apply_threshold(self.sample, th_left)
         self.bitmask = envs.utils.apply_opening(self.bitmask, self.opening)
 
-        self._d_sim_old = envs.utils.compute_dissimilarity(self.label, self.bitmask)
+        d_sim = envs.utils.compute_dissimilarity(self.label, self.bitmask)
 
-        return UltraSoundEnv.observation(self.bitmask), {'d_sim': self._d_sim_old}
+        self._d_sim_old = d_sim
+
+        # Expose the internal configuration and obtained dissimilarity
+        info = {
+            'd_sim': d_sim,
+            'configuration': (self.ti_left,)
+        }
+
+        return UltraSoundEnv.observation(self.bitmask), info
 
     def action_mask(self) -> np.ndarray:
         mask = np.zeros(self.action_space.n)
