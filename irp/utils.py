@@ -424,3 +424,6 @@ def construct_environment(sample: np.ndarray, label: np.ndarray, wrappers: List,
 
 def cantor_pairing(a: int, b: int) -> int:
     return int((a + b) * (a + b + 1) / 2 + a)
+
+def indexof(sequence, value):
+    return next((idx for idx, val in enumerate(sequence) if val == value), -1)

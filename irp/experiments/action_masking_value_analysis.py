@@ -61,15 +61,15 @@ agent_parameters = {
     'alpha': 0.2,
     'max_t': 5000,
     'max_e': np.inf,
-    'eps_max': 0.8,
-    'eps_min': 0.8,
-    'eps_frac': 1.0,
-    'gamma': 0.8,
+    'eps_max': 1.0,
+    'eps_min': 0.3,
+    'eps_frac': 0.999,
+    'gamma': 0.95,
 }
 environment_parameters = {
     'n_thresholds': 5,
-    'opening': 0,
-    'sahba': True
+    'opening': [0],
+    'sahba': False
 }
 
 (image, truth), (t_image, t_truth) = irp.utils.stacked_read_sample('case10_10.png', 'case10_11.png')
@@ -87,7 +87,7 @@ for coord in coords:
     environment = Env(sample, label, **environment_parameters)
     environment = Tiled(environment, **tiling_parameters)
 
-    agent = Qlearning(environment)
+    agent = Sarsa(environment)
     policy = agent.learn(**agent_parameters)
 
     t_environment = Env(t_sample, t_label, **environment_parameters)

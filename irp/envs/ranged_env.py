@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import itertools
 import numpy as np
@@ -12,13 +12,13 @@ from irp.envs.base_env import UltraSoundEnv
 class RangedEnv(env.Env):
     action_mapping = list(itertools.product([-1, 1, 0], [-1, 1, 0]))
 
-    def __init__(self, sample: np.ndarray, label: np.ndarray, n_thresholds: int, opening: Optional[int] = 0, sahba: Optional[bool] = True):
+    def __init__(self, sample: np.ndarray, label: np.ndarray, n_thresholds: int, opening: Optional[List[int]] = [], sahba: Optional[bool] = True):
         super().__init__(sample, label, n_thresholds, opening, sahba)
 
         self._threshold_indices = self.make_threshold_indices(n_thresholds)
         self._d_sim_opt = irp.utils.get_best_dissimilarity(
             sample, label,
-            [itertools.product(self._intensity_spectrum, self._intensity_spectrum), [opening]],
+            [itertools.product(self._intensity_spectrum, self._intensity_spectrum), [self._openings]],
             [envs.utils.apply_threshold, envs.utils.apply_opening]
         )
 
@@ -40,7 +40,7 @@ class RangedEnv(env.Env):
         # Expose the internal configuration and obtained dissimilarity
         info = {
             'd_sim': d_sim,
-            'configuration': (self.ti_left,)
+            'configuration': (self.ti_left, self.ti_right)
         }
 
         return UltraSoundEnv.observation(self.bitmask), reward, done, info
@@ -62,20 +62,24 @@ class RangedEnv(env.Env):
         return ti_left, ti_right, bitmask
 
     def reset(self, ti: Optional[Tuple[int, int]] = None) -> Tuple[Tuple[float, float, int], Dict[str, float]]:
-        # Select random index for initial threshold indices
-        ti_index = np.random.randint(len(self._threshold_indices))
-
         # Pick random threshold intensity, or use the one specified by the user
-        self.ti_left, self.ti_right = self._threshold_indices[ti_index] if ti is None else ti
+        self.ti_left, self.ti_right = sorted(np.random.randint(0, self.n_thresholds, 2)) if ti is None else ti
         th_left, th_right = self._intensity_spectrum[self.ti_left], self._intensity_spectrum[self.ti_right]
 
         # Compute the bitmask and compute the dissimilarity metric
         self.bitmask = envs.utils.apply_threshold(self.sample, th_left, th_right)
         self.bitmask = envs.utils.apply_opening(self.bitmask, self.opening)
 
-        self._d_sim_old = envs.utils.compute_dissimilarity(self.label, self.bitmask)
+        d_sim = envs.utils.compute_dissimilarity(self.label, self.bitmask)
 
-        return UltraSoundEnv.observation(self.bitmask), {'d_sim': self._d_sim_old}
+        self._d_sim_old = d_sim
+
+        info = {
+            'd_sim': d_sim,
+            'configuration': (self.ti_left, self.ti_right)
+        }
+
+        return UltraSoundEnv.observation(self.bitmask), info
 
     def action_mask(self) -> np.ndarray:
         mask = np.zeros(self.action_space.n)
@@ -87,8 +91,8 @@ class RangedEnv(env.Env):
             # Check if this action doesn't make the index go out of bounds
             valid = ti_left >= 0 and ti_right >= 0 and ti_left < self.n_thresholds and ti_right < self.n_thresholds
 
-            # Check if this action doesn't make the left threshold higher than the right threshold (but allow 0, 0)
-            valid = valid and (ti_left < ti_right or (ti_left == 0 and ti_right == 0))
+            # Check if this action doesn't make the left threshold higher than the right threshold
+            valid = valid and ti_left <= ti_right
 
             mask[action] = valid
 

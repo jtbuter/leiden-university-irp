@@ -17,7 +17,7 @@ class Env(gym.Env):
     # The number of features the state-vector consists of
     n_features = 3
 
-    def __init__(self, sample: np.ndarray, label: np.ndarray, n_thresholds: int, opening: Optional[int] = 0, sahba: Optional[bool] = True):
+    def __init__(self, sample: np.ndarray, label: np.ndarray, n_thresholds: int, opening: Optional[List[int]] = [0], sahba: Optional[bool] = True):
         self.sample = sample
         self.label = label
 
@@ -26,12 +26,12 @@ class Env(gym.Env):
         self._intensity_spectrum = envs.utils.get_intensity_spectrum(sample, n_thresholds, add_minus=True)
         
         self.n_thresholds = len(self._intensity_spectrum)
-        self.opening = opening
+        self._openings = opening[0]
         self.sahba = sahba
 
         self._d_sim_opt = irp.utils.get_best_dissimilarity(
             sample, label,
-            [self._intensity_spectrum, [opening]],
+            [self._intensity_spectrum, [self._openings]],
             [envs.utils.apply_threshold, envs.utils.apply_opening]
         )
 
@@ -76,7 +76,7 @@ class Env(gym.Env):
 
         # Compute the new bitmask
         bitmask = envs.utils.apply_threshold(self.sample, th_left)
-        bitmask = envs.utils.apply_opening(bitmask, self.opening)
+        bitmask = envs.utils.apply_opening(bitmask, self._openings)
 
         return ti_left, bitmask
 
@@ -87,7 +87,7 @@ class Env(gym.Env):
 
         # Compute the bitmask and compute the dissimilarity metric
         self.bitmask = envs.utils.apply_threshold(self.sample, th_left)
-        self.bitmask = envs.utils.apply_opening(self.bitmask, self.opening)
+        self.bitmask = envs.utils.apply_opening(self.bitmask, self._openings)
 
         d_sim = envs.utils.compute_dissimilarity(self.label, self.bitmask)
 
