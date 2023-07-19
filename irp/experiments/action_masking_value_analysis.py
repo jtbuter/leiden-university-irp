@@ -42,11 +42,6 @@ def evaluate(environment: Tiled, policy, steps: int = 10, ti: int = None):
     # Find the best guess of the optimal dissimilarity
     return bitmasks[np.argmin(values)], similarities[np.argmin(values)]
 
-def find_terminal_state(values, d_sims):
-    smallest_value_index = np.argmin(values)
-
-    return smallest_value_index
-
 image_parameters = {
     'subimage_width': 16,
     'subimage_height': 8,

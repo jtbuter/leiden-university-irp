@@ -41,7 +41,8 @@ agent_parameters = {
 }
 environment_parameters = {
     'n_thresholds': 5,
-    'opening': 0
+    'opening': [0],
+    'sahba': False
 }
 
 real = irp.utils.read_image(os.path.join(irp.GIT_DIR, '../data/trus/labels/case10_11.png'))
@@ -77,11 +78,11 @@ for coord in coords:
     t_environment = Tiled(t_environment, **tiling_parameters)
     # t_environment = ActionMasker(t_environment)
 
-    d_sim = evaluate(t_environment, policy, ti=0)
+    bitmask, d_sim = irp.utils.evaluate(t_environment, policy, ti=0, detect_oscillation=environment_parameters['sahba'])
 
     print(coord, d_sim, t_environment.d_sim_opt)
 
-    result[y:y+image_parameters['subimage_height'], x:x+image_parameters['subimage_width']] = t_environment.bitmask
+    result[y:y+image_parameters['subimage_height'], x:x+image_parameters['subimage_width']] = bitmask
 
 print(sklearn.metrics.f1_score((real / 255).astype(bool).flatten(), (result / 255).astype(bool).flatten()))
 

@@ -62,46 +62,84 @@ def extract_coordinates(
  
     return coords
 
-def evaluate(environment: gym.Env, policy, max_steps: Optional[int] = 10, wait_for_done: Optional[bool] = False) -> Tuple[float, bool, np.ndarray]:
-    opt_states = []
+# def evaluate(environment: gym.Env, policy, max_steps: Optional[int] = 10, wait_for_done: Optional[bool] = False) -> Tuple[float, bool, np.ndarray]:
+#     opt_states = []
 
-    for ti in range(len(environment.intensity_spectrum)):
-        for vj in range(len(environment.openings)):
-            state, info = environment.reset(ti=ti, vi=vj)
+#     for ti in range(len(environment.intensity_spectrum)):
+#         for vj in range(len(environment.openings)):
+#             state, info = environment.reset(ti=ti, vi=vj)
 
-            if info['d_sim'] == environment.d_sim_opt:
-                opt_states.append(tuple(state))
+#             if info['d_sim'] == environment.d_sim_opt:
+#                 opt_states.append(tuple(state))
 
-    state, info = tuple(environment.reset(ti=0, vi=0))
+#     state, info = tuple(environment.reset(ti=0, vi=0))
 
-    states = []
-    configs = []
-    values = []
+#     states = []
+#     configs = []
+#     values = []
 
-    for i in range(max_steps):
-        max_q_val = max(policy.values(state)[environment.action_mask()])
-        config = environment.configuration
+#     for i in range(max_steps):
+#         max_q_val = max(policy.values(state)[environment.action_mask()])
+#         config = environment.configuration
 
-        states.append(tuple(state))
-        values.append(max_q_val)
-        configs.append(config)
+#         states.append(tuple(state))
+#         values.append(max_q_val)
+#         configs.append(config)
 
-        cycle = find_repeating_path(configs)
+#         cycle = find_repeating_path(configs)
 
-        if cycle:
-            states = np.asarray(states)
-            values = np.asarray(values)
-            configs = np.asarray(configs)
+#         if cycle:
+#             states = np.asarray(states)
+#             values = np.asarray(values)
+#             configs = np.asarray(configs)
 
-            predicted_state = tuple(states[cycle[0] + np.argmin(values[cycle])])
-            found = predicted_state in opt_states
+#             predicted_state = tuple(states[cycle[0] + np.argmin(values[cycle])])
+#             found = predicted_state in opt_states
 
-            return found
+#             return found
 
-        action = policy.predict(state, environment.action_mask)
+#         action = policy.predict(state, environment.action_mask)
+#         state, reward, done, info = environment.step(action)
+
+#     return False
+
+def evaluate(
+    environment: gym.Env,
+    policy,
+    steps: int = 10,
+    ti: Optional[Union[int, Tuple]] = None,
+    detect_oscillation: Optional[bool] = True
+) -> Tuple[np.ndarray, float]:
+    # Keep state-value-similarity-config history
+    histories = []
+
+    state, info = environment.reset(ti=ti)
+    
+    histories.append((np.max(policy.values(state)), info['d_sim'], info['configuration'], environment.bitmask))
+
+    for i in range(steps):
+        action = policy.predict(state, environment.action_mask, deterministic=True)
         state, reward, done, info = environment.step(action)
+    
+        histories.append((np.max(policy.values(state)), info['d_sim'], info['configuration'], environment.bitmask))
 
-    return False
+    values, similarities, configs, bitmasks = [np.asarray(history) for history in zip(*histories)]
+
+    # If we don't want to return the terminal state based on the oscillation property, just return the last found bitmask
+    if not detect_oscillation:
+        return bitmasks[-1], similarities[-1]
+
+    path = find_repeating_path(list(map(tuple, configs)))
+    
+    # Otherwise, check if there was a repeating path
+    if path:
+        best_bitmask = bitmasks[np.argmin(values[path]) + path[0]]
+        best_d_sim = similarities[np.argmin(values[path]) + path[0]]
+
+        return best_bitmask, best_d_sim
+
+    # There was no path, so find the best guess of the optimal dissimilarity
+    return bitmasks[np.argmin(values)], similarities[np.argmin(values)]
 
 def extract_subimages(
     *samples: np.ndarray,
